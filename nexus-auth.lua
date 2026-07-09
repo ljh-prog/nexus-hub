@@ -78,9 +78,9 @@ local function getHWID()
     end
     
     if hash == "" or not hash then
-
+        local h = 5381
         for i = 1, #rawHWID do
-            h = ((h << 5) + h + string.byte(rawHWID, i)) % 2147483647
+            h = (h * 33 + string.byte(rawHWID, i)) % 2147483647
         end
         hash = string.format("%x", h)
     end
