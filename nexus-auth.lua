@@ -105,7 +105,8 @@ local function httpRequest(url, method, body)
                 Url = url,
                 Method = method,
                 Headers = {
-                    ["Content-Type"] = "application/json"
+                    ["Content-Type"] = "application/json",
+                    ["ngrok-skip-browser-warning"] = "true"
                 },
                 Body = body
             })
@@ -117,7 +118,8 @@ local function httpRequest(url, method, body)
                 Url = url,
                 Method = method,
                 Headers = {
-                    ["Content-Type"] = "application/json"
+                    ["Content-Type"] = "application/json",
+                    ["ngrok-skip-browser-warning"] = "true"
                 },
                 Body = body
             })
@@ -129,7 +131,8 @@ local function httpRequest(url, method, body)
                 Url = url,
                 Method = method,
                 Headers = {
-                    ["Content-Type"] = "application/json"
+                    ["Content-Type"] = "application/json",
+                    ["ngrok-skip-browser-warning"] = "true"
                 },
                 Body = body
             })
@@ -141,7 +144,8 @@ local function httpRequest(url, method, body)
                 Url = url,
                 Method = method,
                 Headers = {
-                    ["Content-Type"] = "application/json"
+                    ["Content-Type"] = "application/json",
+                    ["ngrok-skip-browser-warning"] = "true"
                 },
                 Body = body
             })
@@ -159,7 +163,7 @@ local function httpRequest(url, method, body)
             local resp = game:GetService("HttpService"):RequestAsync({
                 Url = url,
                 Method = method,
-                Headers = { ["Content-Type"] = "application/json" },
+                Headers = { ["Content-Type"] = "application/json", ["ngrok-skip-browser-warning"] = "true" },
                 Body = body
             })
             return { Body = resp.Body, StatusCode = resp.StatusCode }
