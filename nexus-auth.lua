@@ -383,14 +383,31 @@ local function main()
     startHeartbeat()
 
     -- 실제 스크립트 실행 로그를 웹 서버로 전송 (디바이스/실행 감지)
-    pcall(function()
+    print("[Nexus] Sending execution log...")
+    local execOk, execErr = pcall(function()
+        local executorName = "Unknown"
+        local exOk, exResult = pcall(function()
+            if identifyexecutor then
+                local name = identifyexecutor()
+                return tostring(name)
+            end
+            return "Unknown"
+        end)
+        if exOk and exResult then
+            executorName = exResult
+        end
+
         local runBody = game:GetService("HttpService"):JSONEncode({
             key = script_key,
             hwid = getHWID(),
-            executor = identifyexecutor and identifyexecutor() or "Unknown"
+            executor = executorName
         })
-        httpRequest(AUTH_SERVER .. "/api/execute", "POST", runBody)
+        local respBody, statusCode = httpRequest(AUTH_SERVER .. "/api/execute", "POST", runBody)
+        print("[Nexus] /api/execute -> status: " .. tostring(statusCode))
     end)
+    if not execOk then
+        print("[Nexus] ❌ Execute-log block errored: " .. tostring(execErr))
+    end
 
     loadMainScript(result)
 end
