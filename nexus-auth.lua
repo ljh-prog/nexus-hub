@@ -1,32 +1,10 @@
---[[
-    Nexus Private - Roblox Auth Wrapper (v3)
-    이 스크립트를 executor에 넣으면 자동으로 인증 후 메인 스크립트를 로드합니다.
-    
-    사용 방법:
-    1. 디스코드에서 Get Scripts 버튼으로 스크립트를 받습니다
-    2. executor에 붙여넣고 실행합니다
-    3. 자동으로 인증 후 메인 스크립트가 실행됩니다
-    
-    주의: 이 스크립트는 서버 URL과 키를 포함합니다.
-    다른 사람과 공유하지 마세요!
-    
-    변경사항 (v3):
-      - Volt executor 지원 추가
-      - 더 많은 executor HTTP 함수 지원
-      - HWID 감지 개선 (게임 정보 + executor 정보)
-      - 디버그 출력 추가
-      - script_key를 전역 변수로 변경 (Get Scripts에서 주입 가능)
-]]
-
--- ==================== CONFIG ====================
 local AUTH_SERVER = "http://58.229.197.183:8080"
-script_key = script_key or "YOUR_KEY_HERE" -- Get Scripts에서 받은 키를 여기에 넣으세요
+local script_key = script_key or "YOUR_KEY_HERE" 
 
--- ==================== HWID GENERATOR ====================
 local function getHWID()
     local hwidParts = {}
     
-    -- executor별 HWID 함수 시도 (가장 많은 executor 지원)
+
     pcall(function()
         if hwid and type(hwid) == "function" then
             local h = hwid()
@@ -41,14 +19,14 @@ local function getHWID()
         end
     end)
     
-    -- Volt / Fluxus / 기타 executor
+
     pcall(function()
         if gethwid and type(gethwid) == "string" then
             table.insert(hwidParts, gethwid)
         end
     end)
     
-    -- executor 식별자 추가
+
     pcall(function()
         if identifyexecutor then
             local name, version = identifyexecutor()
@@ -56,7 +34,7 @@ local function getHWID()
         end
     end)
     
-    -- Fallback: 게임 정보 기반 HWID (항상 가능)
+
     pcall(function()
         local players = game:GetService("Players")
         local lp = players.LocalPlayer
@@ -77,14 +55,13 @@ local function getHWID()
         table.insert(hwidParts, tostring(game.JobId))
     end)
     
-    -- 최종 HWID: 모든 파트를 해시
+
     local rawHWID = table.concat(hwidParts, "-")
     
     if #rawHWID == 0 then
         rawHWID = "fallback-" .. tostring(math.random(100000, 999999))
     end
-    
-    -- 해시 (지원되는 함수 우선)
+
     local hash = ""
     pcall(function()
         if crypt and crypt.hash then
@@ -101,8 +78,7 @@ local function getHWID()
     end
     
     if hash == "" or not hash then
-        -- Fallback: 간단한 해시
-        local h = 5381
+
         for i = 1, #rawHWID do
             h = ((h << 5) + h + string.byte(rawHWID, i)) % 2147483647
         end
@@ -116,14 +92,14 @@ local function getHWID()
     return tostring(hash)
 end
 
--- ==================== HTTP REQUEST ====================
+
 local function httpRequest(url, method, body)
     method = method or "GET"
     
     print("[Nexus] HTTP " .. method .. " " .. url)
     
     local success, result = pcall(function()
-        -- 1. request (가장 일반적 - Synapse, Krnl, Volt 등)
+
         if request then
             return request({
                 Url = url,
@@ -135,7 +111,7 @@ local function httpRequest(url, method, body)
             })
         end
         
-        -- 2. http_request
+
         if http_request then
             return http_request({
                 Url = url,
@@ -329,7 +305,7 @@ local function authenticate()
     return true, parsed
 end
 
--- ==================== LOAD SCRIPT ====================
+
 local function loadMainScript(authData)
     if not authData or not authData.script_url then
         print("[Nexus] ❌ No script URL received")
@@ -345,7 +321,6 @@ local function loadMainScript(authData)
         return false
     end
     
-    -- 스크립트 실행
     local success, err = pcall(function()
         local func = loadstring(scriptContent)
         if func then
@@ -364,14 +339,13 @@ local function loadMainScript(authData)
     return true
 end
 
--- ==================== HEARTBEAT LOOP ====================
-local sessionToken = nil
+
 local function startHeartbeat()
     if not sessionToken then return end
     
     task.spawn(function()
         while true do
-            task.wait(300) -- 5분마다 하트비트
+            task.wait(300) 
             local body = game:GetService("HttpService"):JSONEncode({
                 session_token = sessionToken
             })
@@ -380,17 +354,17 @@ local function startHeartbeat()
     end)
 end
 
--- ==================== MAIN ====================
+
 local function main()
     print("[Nexus] ===================================")
     print("[Nexus] Nexus Private Auth Wrapper v3")
     print("[Nexus] ===================================")
     
-    -- 인증
+
     local success, result, errorCode = authenticate()
     
     if not success then
-        -- HWID 불일치인지 확인
+
         local isHWIDError = (errorCode == "HWID_MISMATCH")
         
         if isHWIDError then
@@ -403,14 +377,23 @@ local function main()
         end
         return
     end
-    
-    -- 세션 토큰 저장
+
     sessionToken = result.session_token
+
     startHeartbeat()
-    
-    -- 메인 스크립트 로드
+
+    -- 실제 스크립트 실행 로그를 웹 서버로 전송 (디바이스/실행 감지)
+    pcall(function()
+        local runBody = game:GetService("HttpService"):JSONEncode({
+            key = script_key,
+            hwid = getHWID(),
+            executor = identifyexecutor and identifyexecutor() or "Unknown"
+        })
+        httpRequest(AUTH_SERVER .. "/api/execute", "POST", runBody)
+    end)
+
     loadMainScript(result)
 end
 
--- 실행
+
 main()
