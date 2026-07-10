@@ -78,7 +78,7 @@ local function getHWID()
     end
     
     print("[Nexus] HWID parts: " .. #hwidParts .. " detected")
-    print("[Nexus] Raw HWID length: " .. #rawHWID)
+    print("[Nexus] Raw HWID string: " .. rawHWID)
     print("[Nexus] Final HWID: " .. tostring(hash):sub(1, 16) .. "...")
     
     return tostring(hash)
