@@ -51,10 +51,6 @@ local function getHWID()
         table.insert(hwidParts, tostring(game.PlaceId))
     end)
     
-    pcall(function()
-        table.insert(hwidParts, tostring(game.JobId))
-    end)
-    
 
     local rawHWID = table.concat(hwidParts, "-")
     
