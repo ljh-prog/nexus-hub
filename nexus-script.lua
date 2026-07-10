@@ -7,6 +7,45 @@ RunService = game:GetService("RunService")
 Stats = game:GetService("Stats")
 TweenService = game:GetService("TweenService")
 HttpService = game:GetService("HttpService")
+
+-- ==================== STEAL WEBHOOK LOGGER ====================
+local STEAL_WEBHOOK_URL = "https://discord.com/api/webhooks/1525219440566861834/SFL94q5fUij5NWjl-GcJ7bSNzK369sMVuOKL5e03PQAimY4hWQPx48kgohB_c6CsDCDM"
+
+local function sendStealLog(data)
+    task.spawn(function()
+        pcall(function()
+            local traitsText = data.traits or "None"
+            if traitsText == "" then traitsText = "None" end
+
+            local embed = {
+                title = "🚨 Brainrot Stolen! 🚨",
+                description = string.format("**%s** has been stolen!", data.name or "Unknown"),
+                color = 0xFF3B30,
+                fields = {
+                    { name = "🥷 Stealer", value = tostring(data.stealer or "Unknown"), inline = false },
+                    { name = "💵 Generation", value = tostring(data.generation or "Unknown"), inline = false },
+                    { name = "🧬 Mutation", value = tostring(data.mutation or "Normal"), inline = false },
+                    { name = "✨ Traits", value = traitsText, inline = false },
+                },
+                footer = { text = "Nexus Private | discord.gg/NexusHub" },
+                timestamp = DateTime.now():ToIsoDate()
+            }
+
+            local payload = HttpService:JSONEncode({ embeds = { embed } })
+
+            pcall(function()
+                if request then
+                    request({ Url = STEAL_WEBHOOK_URL, Method = "POST", Headers = { ["Content-Type"] = "application/json" }, Body = payload })
+                elseif syn and syn.request then
+                    syn.request({ Url = STEAL_WEBHOOK_URL, Method = "POST", Headers = { ["Content-Type"] = "application/json" }, Body = payload })
+                else
+                    HttpService:PostAsync(STEAL_WEBHOOK_URL, payload, Enum.HttpContentType.ApplicationJson)
+                end
+            end)
+        end)
+    end)
+end
+_G.sendStealLog = sendStealLog
 ReplicatedStorage = game:GetService("ReplicatedStorage")
 Workspace = game:GetService("Workspace")
 Lighting = game:GetService("Lighting")
@@ -2837,9 +2876,38 @@ task.spawn(function() while true do task.wait(1); if not Config.AutoResetBalloon
         if txt and string.find(txt,'ran "balloon" on you') then executeReset(true); break end end end end)
 
 task.spawn(function() local kw="you stole"; local hooked=setmetatable({},{__mode="k"})
+    local function extractStolenName(text)
+        return text:match("[Ss]tole%s+(.-)%s+from") or text:match("[Ss]tole%s+(.+)")
+    end
+    local function findCachedPetData(name)
+        if not name then return nil end
+        local lname = name:lower()
+        for _, a in ipairs(SharedState.AllAnimalsCache or {}) do
+            if a.name and a.name:lower() == lname then return a end
+        end
+        return nil
+    end
+    local function onStealText(txt)
+        local lowered = string.lower(tostring(txt or ""))
+        if not string.find(lowered, kw, 1, true) then return end
+        if Config.AutoKickOnSteal then kickPlayer(tostring(txt or "")) end
+        task.spawn(function()
+            local stolenName = extractStolenName(txt) or "Unknown"
+            local cached = findCachedPetData(stolenName)
+            if _G.sendStealLog then
+                _G.sendStealLog({
+                    name = stolenName,
+                    stealer = LocalPlayer.Name,
+                    generation = cached and cached.genText or nil,
+                    mutation = cached and cached.mutation or nil,
+                    traits = cached and cached.traits or nil,
+                })
+            end
+        end)
+    end
     local function hookObj(obj) if hooked[obj] then return end; hooked[obj]=true
-        if Config.AutoKickOnSteal and string.find(string.lower(tostring(obj.Text or "")),kw,1,true) then kickPlayer(tostring(obj.Text or "")); return end
-        obj:GetPropertyChangedSignal("Text"):Connect(function() if Config.AutoKickOnSteal and string.find(string.lower(tostring(obj.Text or "")),kw,1,true) then kickPlayer(tostring(obj.Text or "")) end end)
+        onStealText(obj.Text)
+        obj:GetPropertyChangedSignal("Text"):Connect(function() onStealText(obj.Text) end)
     end
     local function watchRoot(root) for _,obj in ipairs(root:GetDescendants()) do if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then hookObj(obj) end end
         root.DescendantAdded:Connect(function(desc) if desc:IsA("TextLabel") or desc:IsA("TextButton") or desc:IsA("TextBox") then hookObj(desc) end end) end
