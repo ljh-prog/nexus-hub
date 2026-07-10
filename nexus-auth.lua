@@ -44,10 +44,6 @@ local function getHWID()
     end)
     
     pcall(function()
-        table.insert(hwidParts, tostring(game.GameId))
-    end)
-    
-    pcall(function()
         table.insert(hwidParts, tostring(game.PlaceId))
     end)
     
@@ -393,22 +389,11 @@ local function main()
     if not success then
 
         local isHWIDError = (errorCode == "HWID_MISMATCH")
-        
-        if isHWIDError then
-            showErrorUI(
-                "⚠️ HWID Mismatch!\n\nThis key is bound to another device.\nTo use this script on this device, go to the Discord server and click the HWID Reset button.",
-                true
-            )
-        else
-            showErrorUI(result or "Unknown error", false)
-        end
 
-        -- 인증 실패 시 잠깐 메시지를 보여준 뒤 강제로 게임에서 튕김
-        task.delay(3, function()
-            forceKick(isHWIDError
-                and "[Nexus] HWID mismatch - this key is bound to another device. Reset your HWID on Discord."
-                or ("[Nexus] Authentication failed: " .. tostring(result or "Unknown error")))
-        end)
+        -- 커스텀 패널 대신 로벅스 자체 튕김(에러) 화면으로 바로 표시
+        forceKick(isHWIDError
+            and "[Nexus] HWID Mismatch - This key is bound to another device.\nGo to our Discord server and use HWID Reset, then rejoin.\n\nError Code: 267"
+            or ("[Nexus] Authentication failed: " .. tostring(result or "Unknown error") .. "\n\nError Code: 267"))
         return
     end
 
