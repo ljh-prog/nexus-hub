@@ -321,7 +321,7 @@ function applyTheme(themeName)
     -- Helper 1: Explicitly style panels to avoid color collision bugs
     local function updatePanelTheme(f, isMain)
         if not f then return end
-        f.BackgroundColor3 = isMain and toTheme.MainBackground or toTheme.Background; f.BackgroundTransparency = 0.25
+        f.BackgroundColor3 = isMain and toTheme.MainBackground or toTheme.Background; f.BackgroundTransparency = isMain and 0.21 or 0.18
         for _, child in ipairs(f:GetChildren()) do
             if child:IsA("UIStroke") then
                 child.Color = Color3.fromRGB(255,255,255)
@@ -739,7 +739,7 @@ Config = {
         InfiniteJump=false, DelayVal=0.4, CloneDelayVal=0.1,
         RagdollTP=false, FPSWait=false, FlyTP=false, FlyTPSpeed=160, FlyTPCloseSpeed=75,
         GrabbleTP=false, GrabbleTPSpeed=230,
-        TpOnLoad=false, MinGenForTp="", MinGenForGrab="",
+        TpOnLoad=false, TpLine=false, MinGenForTp="", MinGenForGrab="",
         BrainrotCarpet=false,
     },
     PriorityList=priorityList,
@@ -6521,7 +6521,8 @@ local function setFPSBoostUltra(enabled)
     Config.FPSBoostUltra = enabled
     saveConfig()
     setToggle("FPS Boost Ultra", enabled)
-    
+    setToggle("FPS Boost", enabled)
+
     if enabled then
         pcall(function()
             settings().Rendering.QualityLevel        = Enum.QualityLevel.Level01
@@ -6529,39 +6530,43 @@ local function setFPSBoostUltra(enabled)
             settings().Physics.AllowSleep = true
             settings().Physics.PhysicsEnvironmentalThrottle = Enum.PhysicsEnvironmentalThrottle or Enum.EnviromentalPhysicsThrottle.Skip
         end)
-        pcall(setfpscap, 0)   -- 0 = unlimited FPS (was 999)
+        pcall(setfpscap, 0)
 
         OptimizeLightingUltra()
         ApplyTerrainUltra()
 
-        local allDesc = Workspace:GetDescendants()
-        local BATCH_SIZE = 200
-        for i = 1, #allDesc, BATCH_SIZE do
-            local batchEnd = math.min(i + BATCH_SIZE - 1, #allDesc)
-            for j = i, batchEnd do
-                local obj = allDesc[j]
-                if obj and obj.Parent then
-                    if IsBase(obj) then
-                        MakeTransparentUltra(obj)
-                    elseif IsClothing(obj) then
-                        SafeDestroyUltra(obj)
-                    elseif IsInBase(obj) then
-                        -- skip
-                    elseif IsCharacterPart(obj) then
-                        -- skip
-                    elseif IsOutOfRange(obj) then
-                        SafeDestroyUltra(obj)
-                    else
-                        CleanObjectUltra(obj)
-                        StripObjectUltra(obj)
-                        if obj:IsA("Animator") then
-                            StopAnimationsUltra(obj)
+        -- ★ 배치를 task.spawn으로 분산 처리 → 렉 없이 적용
+        task.spawn(function()
+            local allDesc = Workspace:GetDescendants()
+            local BATCH_SIZE = 40
+            for i = 1, #allDesc, BATCH_SIZE do
+                if not Config.FPSBoostUltra then break end
+                local batchEnd = math.min(i + BATCH_SIZE - 1, #allDesc)
+                for j = i, batchEnd do
+                    local obj = allDesc[j]
+                    if obj and obj.Parent then
+                        if IsBase(obj) then
+                            MakeTransparentUltra(obj)
+                        elseif IsClothing(obj) then
+                            SafeDestroyUltra(obj)
+                        elseif IsInBase(obj) then
+                            -- skip
+                        elseif IsCharacterPart(obj) then
+                            -- skip
+                        elseif IsOutOfRange(obj) then
+                            SafeDestroyUltra(obj)
+                        else
+                            CleanObjectUltra(obj)
+                            StripObjectUltra(obj)
+                            if obj:IsA("Animator") then
+                                StopAnimationsUltra(obj)
+                            end
                         end
-                    end
                 end
             end
-            if i + BATCH_SIZE <= #allDesc then task.wait() end
+            task.wait() -- ★ 매 배치마다 yield → 렉 방지
         end
+        end) -- task.spawn end
 
         AddUltraConnection(Workspace.DescendantAdded:Connect(function(obj)
             task.defer(function()
@@ -7420,7 +7425,7 @@ local function buildRemoteSell()
     rsStatus.BackgroundTransparency=1; rsStatus.Text="Waiting for scan..."; rsStatus.TextColor3=Theme.Dim; rsStatus.Font=Enum.Font.Gotham; rsStatus.TextSize=10; rsStatus.TextXAlignment=Enum.TextXAlignment.Left
 
     local rsScroll=Instance.new("ScrollingFrame",rsFrame); rsScroll.Size=UDim2.new(1,-18,1,-102); rsScroll.Position=UDim2.new(0,9,0,92)
-    rsScroll.BackgroundColor3=Theme.Panel; rsScroll.BorderSizePixel=0; rsScroll.ScrollBarThickness=3; rsScroll.ScrollBarImageColor3=Theme.Accent; rsScroll.Active=true
+    rsScroll.BackgroundColor3=Theme.Panel; rsScroll.BorderSizePixel=0; rsScroll.ScrollBarThickness=3; rsScroll.ScrollBarImageColor3=Theme.Accent; rsScroll.ScrollBarImageTransparency=1; rsScroll.Active=true
     Instance.new("UICorner",rsScroll).CornerRadius=UDim.new(0,8)
     local rsLayout=Instance.new("UIListLayout",rsScroll); rsLayout.Padding=UDim.new(0,4); rsLayout.SortOrder=Enum.SortOrder.LayoutOrder
     rsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() rsScroll.CanvasSize=UDim2.new(0,0,0,rsLayout.AbsoluteContentSize.Y+8) end)
@@ -7639,8 +7644,8 @@ _G.ShowStealProgressBar = function(targetName, duration)
     sg.Parent = ExploitGui
     stealProgressBarGui = sg
     
-    local barWidth = 270
-    local barHeight = 50
+    local barWidth = 300
+    local barHeight = 52
     
     local container = Instance.new("Frame")
     container.Size = UDim2.fromOffset(barWidth, barHeight)
@@ -7649,8 +7654,8 @@ _G.ShowStealProgressBar = function(targetName, duration)
     container.BackgroundTransparency = 0.02
     container.BorderSizePixel = 0
     container.Parent = registerScreenGui(sg)
-    corner(container, 12)
-    addOutline(container)
+    -- 각진 직사각형 (corner 없음)
+    do local _cs=Instance.new("UIStroke",container); _cs.Color=Color3.fromRGB(255,255,255); _cs.Thickness=1.0; _cs.Transparency=0.5; _cs.ApplyStrokeMode=Enum.ApplyStrokeMode.Border end
     
     local title = Instance.new("TextLabel")
     title.Size = UDim2.new(0.6, -14, 0, 16)
@@ -7680,7 +7685,7 @@ _G.ShowStealProgressBar = function(targetName, duration)
     track.BackgroundColor3 = Theme.SliderBg
     track.BorderSizePixel = 0
     track.Parent = container
-    corner(track, 3)
+    corner(track, 0)
     stroke(track, Theme.Stroke, 1, 0.1)
     
     local fill = Instance.new("Frame")
@@ -7688,7 +7693,7 @@ _G.ShowStealProgressBar = function(targetName, duration)
     fill.BackgroundColor3 = Theme.Accent
     fill.BorderSizePixel = 0
     fill.Parent = track
-    corner(fill, 3)
+    corner(fill, 0)
     
     local fillGrad = Instance.new("UIGradient", fill)
     fillGrad.Color = ColorSequence.new({
@@ -7744,13 +7749,19 @@ end
 -- Assign helper implementations to pre-declared outer local variables
 corner = function(o,r) local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,r); c.Parent=o; return c end
 stroke = function(o,col,th,tr) local s=Instance.new("UIStroke"); s.Color=col or Theme.Stroke; s.Thickness=th or 1; s.Transparency=tr or 0; s.ApplyStrokeMode=Enum.ApplyStrokeMode.Border; s.Parent=o; return s end
-tw = function(o,p,t) TweenService:Create(o,TweenInfo.new(t or 0.14,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),p):Play() end
-addOutline = function(f) local o=Instance.new("UIStroke"); o.Color=Color3.fromRGB(255,255,255); o.Thickness=0.5; o.Transparency=0.0; o.ApplyStrokeMode=Enum.ApplyStrokeMode.Border; o.Parent=f; return o end
+tw = function(o,p,t) TweenService:Create(o,TweenInfo.new(t or 0.18,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),p):Play() end
+addOutline = function(f) local o=Instance.new("UIStroke"); o.Color=Color3.fromRGB(255,255,255); o.Thickness=0.7; o.Transparency=0.45; o.ApplyStrokeMode=Enum.ApplyStrokeMode.Border; o.Parent=f; return o end
 function clearBody(body) for _,c in ipairs(body:GetChildren()) do if not c:IsA("UIListLayout") and not c:IsA("UIPadding") then c:Destroy() end end end
 
 function openAnim(f) if not f then return end; local us=f:FindFirstChild("SXEScale") or Instance.new("UIScale"); us.Name="SXEScale"; us.Parent=f
-    local tgt=f.Position; f.Visible=true; us.Scale=0.92; f.Position=UDim2.new(tgt.X.Scale,tgt.X.Offset,tgt.Y.Scale,tgt.Y.Offset+18); tw(us,{Scale=1},0.20); tw(f,{Position=tgt},0.20) end
-function closeAnim(f) if not f then return end; f.Visible = false end
+    local tgt=f.Position; f.Visible=true; us.Scale=0.88; f.Position=UDim2.new(tgt.X.Scale,tgt.X.Offset,tgt.Y.Scale,tgt.Y.Offset+14)
+    TweenService:Create(us,TweenInfo.new(0.28,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Scale=1}):Play()
+    TweenService:Create(f,TweenInfo.new(0.24,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),{Position=tgt}):Play() end
+function closeAnim(f) if not f then return end; local us=f:FindFirstChild("SXEScale") or Instance.new("UIScale"); us.Name="SXEScale"; us.Parent=f
+    local tgt=f.Position
+    TweenService:Create(us,TweenInfo.new(0.16,Enum.EasingStyle.Quint,Enum.EasingDirection.In),{Scale=0.90}):Play()
+    TweenService:Create(f,TweenInfo.new(0.16,Enum.EasingStyle.Quint,Enum.EasingDirection.In),{Position=UDim2.new(tgt.X.Scale,tgt.X.Offset,tgt.Y.Scale,tgt.Y.Offset+10)}):Play()
+    task.delay(0.16,function() if f and f.Parent then f.Visible=false; f.Position=tgt; us.Scale=1 end end) end
 
 makeDraggable = function(frame,handle,saveName) local dragging,dragStart,startPos=false,nil,nil
     handle.InputBegan:Connect(function(i) if UI.Locked then return end; if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then dragging=true; dragStart=i.Position; startPos=frame.Position end end)
@@ -7807,19 +7818,19 @@ function makeHeader(f,t,isMain) local h=Instance.new("Frame"); h.Size=UDim2.new(
     if isMain then local l=Instance.new("TextLabel"); l.Size=UDim2.new(1,-50,0,24); l.Position=UDim2.new(0,13,0,8); l.BackgroundTransparency=1; l.Text=parts[1] or "Nexus Private"; l.TextColor3=Color3.fromRGB(255,215,0); l.Font=Enum.Font.GothamBlack; l.TextSize=16; l.TextXAlignment=Enum.TextXAlignment.Left; l.Parent=h; local hg=Instance.new("UIGradient"); hg.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(255,180,0)),ColorSequenceKeypoint.new(0.3,Color3.fromRGB(255,235,150)),ColorSequenceKeypoint.new(0.5,Color3.fromRGB(255,255,220)),ColorSequenceKeypoint.new(0.7,Color3.fromRGB(255,235,150)),ColorSequenceKeypoint.new(1,Color3.fromRGB(255,180,0))}); hg.Rotation=45; hg.Parent=l; task.spawn(function() while true do for i=0,200 do hg.Offset=Vector2.new(-1+i/100,-1+i/100); task.wait(0.01) end; task.wait(0.3) end end)
     else local l=Instance.new("TextLabel"); l.Size=UDim2.new(1,-58,0,16); l.Position=UDim2.new(0,12,0,7); l.BackgroundTransparency=1; l.Text=parts[1] or "Nexus Private"; l.TextColor3=Theme.Text; l.Font=Enum.Font.GothamBlack; l.TextSize=12; l.TextXAlignment=Enum.TextXAlignment.Center; l.Parent=h
         local s=Instance.new("TextLabel"); s.Size=UDim2.new(1,-58,0,13); s.Position=UDim2.new(0,12,0,21); s.BackgroundTransparency=1; s.Text=parts[2] or ""; s.TextColor3=Theme.Dim; s.Font=Enum.Font.GothamMedium; s.TextSize=10; s.TextXAlignment=Enum.TextXAlignment.Center; s.Parent=h end
-    local d=Instance.new("Frame"); d.Size=UDim2.new(1,-24,0,1); d.Position=UDim2.new(0,12,0,40); d.BackgroundColor3=Color3.fromRGB(70,70,70); d.BackgroundTransparency=0.0; d.BorderSizePixel=0; d.Parent=f
+    local d=Instance.new("Frame"); d.Size=UDim2.new(1,-24,0,1); d.Position=UDim2.new(0,12,0,40); d.BackgroundColor3=Color3.fromRGB(180,180,180); d.BackgroundTransparency=0.55; d.BorderSizePixel=0; d.Parent=f
     makeDraggable(f,h,t); return h end
 
-function makeMainPanel(t,size,pos) local f=Instance.new("Frame"); f.Size=size; f.Position=pos; f.BackgroundColor3=Theme.MainBackground; f.BackgroundTransparency=0.06; f.BorderSizePixel=0; f.ClipsDescendants=true; f.Parent=gui; corner(f,12); addOutline(f)
-    local sidebar=Instance.new("Frame"); sidebar.Size=UDim2.new(0,120,1,0); sidebar.Position=UDim2.new(0,0,0,0); sidebar.BackgroundColor3=Theme.Panel; sidebar.BackgroundTransparency=0.04; sidebar.BorderSizePixel=0; sidebar.Parent=f; corner(sidebar,10)
-    local sbStroke=Instance.new("UIStroke"); sbStroke.Color=Color3.fromRGB(255,255,255); sbStroke.Thickness=0.5; sbStroke.Transparency=0.0; sbStroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Border; sbStroke.Parent=sidebar
+function makeMainPanel(t,size,pos) local f=Instance.new("Frame"); f.Size=size; f.Position=pos; f.BackgroundColor3=Theme.MainBackground; f.BackgroundTransparency=0.21; f.BorderSizePixel=0; f.ClipsDescendants=true; f.Parent=gui; corner(f,12); addOutline(f)
+    local sidebar=Instance.new("Frame"); sidebar.Size=UDim2.new(0,112,1,0); sidebar.Position=UDim2.new(0,0,0,0); sidebar.BackgroundColor3=Theme.Panel; sidebar.BackgroundTransparency=0.04; sidebar.BorderSizePixel=0; sidebar.Parent=f; corner(sidebar,10)
+    local sbRight=Instance.new("Frame"); sbRight.Size=UDim2.new(0,1,1,0); sbRight.Position=UDim2.new(1,-1,0,0); sbRight.BackgroundColor3=Color3.fromRGB(255,255,255); sbRight.BackgroundTransparency=0.65; sbRight.BorderSizePixel=0; sbRight.Parent=sidebar
     local logoFrame=Instance.new("Frame"); logoFrame.Size=UDim2.new(0,46,0,46); logoFrame.Position=UDim2.new(0.5,-23,0,10); logoFrame.BackgroundColor3=Theme.SoftAccent; logoFrame.BorderSizePixel=0; logoFrame.Parent=sidebar; corner(logoFrame,8)
     local logoImg=Instance.new("ImageLabel"); logoImg.Size=UDim2.new(1,0,1,0); logoImg.BackgroundTransparency=1; logoImg.ScaleType=Enum.ScaleType.Stretch; logoImg.Image="rbxthumb://type=Asset&id=81106531045025&w=150&h=150"; logoImg.Parent=logoFrame; corner(logoImg,8)
     local sbDiv=Instance.new("Frame"); sbDiv.Size=UDim2.new(1,-16,0,1); sbDiv.Position=UDim2.new(0,8,0,64); sbDiv.BackgroundColor3=Theme.Accent; sbDiv.BackgroundTransparency=0.4; sbDiv.BorderSizePixel=0; sbDiv.Parent=sidebar
-    local sbScroll=Instance.new("ScrollingFrame"); sbScroll.Size=UDim2.new(1,-6,1,-72); sbScroll.Position=UDim2.new(0,3,0,70); sbScroll.BackgroundTransparency=1; sbScroll.BorderSizePixel=0; sbScroll.ScrollBarThickness=2; sbScroll.ScrollBarImageColor3=Theme.Accent; sbScroll.CanvasSize=UDim2.new(0,0,0,0); sbScroll.Active=true; sbScroll.Parent=sidebar
-    local sbLayout=Instance.new("UIListLayout"); sbLayout.Padding=UDim.new(0,4); sbLayout.Parent=sbScroll
+    local sbScroll=Instance.new("ScrollingFrame"); sbScroll.Size=UDim2.new(1,-6,1,-72); sbScroll.Position=UDim2.new(0,3,0,70); sbScroll.BackgroundTransparency=1; sbScroll.BorderSizePixel=0; sbScroll.ScrollBarThickness=2; sbScroll.ScrollBarImageColor3=Theme.Accent; sbScroll.ScrollBarImageTransparency=1; sbScroll.CanvasSize=UDim2.new(0,0,0,0); sbScroll.Active=true; sbScroll.Parent=sidebar
+    local sbLayout=Instance.new("UIListLayout"); sbLayout.Padding=UDim.new(0,5); sbLayout.Parent=sbScroll
     sbLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() sbScroll.CanvasSize=UDim2.new(0,0,0,sbLayout.AbsoluteContentSize.Y+6) end)
-    local body=Instance.new("ScrollingFrame"); body.Size=UDim2.new(1,-128,1,-12); body.Position=UDim2.new(0,124,0,6); body.BackgroundTransparency=1; body.BorderSizePixel=0; body.ScrollBarThickness=3; body.ScrollBarImageColor3=Theme.Accent; body.CanvasSize=UDim2.new(0,0,0,0); body.Active=true; body.Parent=f
+    local body=Instance.new("ScrollingFrame"); body.Size=UDim2.new(1,-126,1,-14); body.Position=UDim2.new(0,118,0,8); body.BackgroundTransparency=1; body.BorderSizePixel=0; body.ScrollBarThickness=3; body.ScrollBarImageColor3=Theme.Accent; body.ScrollBarImageTransparency=1; body.CanvasSize=UDim2.new(0,0,0,0); body.Active=true; body.Parent=f
     local lay=Instance.new("UIListLayout"); lay.Padding=UDim.new(0,8); lay.Parent=body
     lay:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() body.CanvasSize=UDim2.new(0,0,0,lay.AbsoluteContentSize.Y+12) end)
     if Config.sizes and Config.sizes[t] then f.Size = UDim2.new(0, Config.sizes[t].x, 0, Config.sizes[t].y) end
@@ -7828,8 +7839,8 @@ function makeMainPanel(t,size,pos) local f=Instance.new("Frame"); f.Size=size; f
     makeDraggable(f, sidebar, t)
     return f,body end
 
-function makeQuickPanel(t,size,pos) local f=Instance.new("Frame"); f.Size=size; f.Position=pos; f.BackgroundColor3=Theme.Background; f.BackgroundTransparency=0.25; f.BorderSizePixel=0; f.ClipsDescendants=true; f.Parent=gui; corner(f,10); addOutline(f); makeHeader(f,t,false)
-    local body=Instance.new("ScrollingFrame"); body.Size=UDim2.new(1,-12,1,-50); body.Position=UDim2.new(0,6,0,46); body.BackgroundTransparency=1; body.BorderSizePixel=0; body.ScrollBarThickness=3; body.ScrollBarImageColor3=Theme.Accent; body.CanvasSize=UDim2.new(0,0,0,0); body.Active=true; body.Parent=f
+function makeQuickPanel(t,size,pos) local f=Instance.new("Frame"); f.Size=size; f.Position=pos; f.BackgroundColor3=Theme.Background; f.BackgroundTransparency=0.18; f.BorderSizePixel=0; f.ClipsDescendants=true; f.Parent=gui; corner(f,10); addOutline(f); makeHeader(f,t,false)
+    local body=Instance.new("ScrollingFrame"); body.Size=UDim2.new(1,-12,1,-50); body.Position=UDim2.new(0,6,0,46); body.BackgroundTransparency=1; body.BorderSizePixel=0; body.ScrollBarThickness=3; body.ScrollBarImageColor3=Theme.Accent; body.ScrollBarImageTransparency=1; body.CanvasSize=UDim2.new(0,0,0,0); body.Active=true; body.Parent=f
     local lay=Instance.new("UIListLayout"); lay.Padding=UDim.new(0,6); lay.Parent=body
     lay:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() body.CanvasSize=UDim2.new(0,0,0,lay.AbsoluteContentSize.Y+10) end); 
     if Config.sizes and Config.sizes[t] then f.Size = UDim2.new(0, Config.sizes[t].x, 0, Config.sizes[t].y) end
@@ -7865,9 +7876,9 @@ function makeQuickButton(parent,text,callback,bg) local b=Instance.new("TextButt
     b.MouseEnter:Connect(function() tw(b,{BackgroundColor3=bg or Theme.SoftButtonHover},0.12) end); b.MouseLeave:Connect(function() tw(b,{BackgroundColor3=bg or Theme.SoftButton},0.12) end)
     b.MouseButton1Click:Connect(function() if callback then callback() end end); return b end
 
-function makeQuickSlider(parent,text,min,max,default,callback,suffix) local holder=Instance.new("Frame"); holder.Size=UDim2.new(1,-4,0,50); holder.BackgroundTransparency=1; holder.Parent=parent
+function makeQuickSlider(parent,text,min,max,default,callback,suffix) local holder=Instance.new("Frame"); holder.Size=UDim2.new(1,-4,0,50); holder.BackgroundColor3=Color3.fromRGB(28,28,35); holder.BackgroundTransparency=0.18; holder.BorderSizePixel=0; corner(holder,8); holder.Parent=parent
     local label=Instance.new("TextLabel"); label.Size=UDim2.new(1,0,0,16); label.Position=UDim2.new(0,4,0,0); label.BackgroundTransparency=1; label.Text=text..": "..tostring(default)..(suffix or ""); label.TextColor3=Theme.Text; label.Font=Enum.Font.GothamMedium; label.TextSize=10; label.TextXAlignment=Enum.TextXAlignment.Left; label.Parent=holder
-    local bar=Instance.new("Frame"); bar.Size=UDim2.new(1,-10,0,6); bar.Position=UDim2.new(0,4,0,26); bar.BackgroundColor3=Theme.SliderBg; bar.BorderSizePixel=0; bar.Parent=holder; corner(bar,10)
+    local bar=Instance.new("Frame"); bar.Size=UDim2.new(1,-10,0,8); bar.Position=UDim2.new(0,4,0,26); bar.BackgroundColor3=Color3.fromRGB(55,55,62); bar.BorderSizePixel=0; bar.Parent=holder; corner(bar,10); do local _bs=Instance.new("UIStroke",bar); _bs.Color=Color3.fromRGB(100,100,110); _bs.Thickness=1; _bs.Transparency=0.5; _bs.ApplyStrokeMode=Enum.ApplyStrokeMode.Border end
     local fill=Instance.new("Frame"); fill.Size=UDim2.new(math.clamp((default-min)/(max-min),0,1),0,1,0); fill.BackgroundColor3=Theme.Accent; fill.BorderSizePixel=0; fill.Parent=bar; corner(fill,10)
     local knob=Instance.new("Frame"); knob.Size=UDim2.new(0,14,0,14); knob.AnchorPoint=Vector2.new(0.5,0.5); knob.Position=UDim2.new(math.clamp((default-min)/(max-min),0,1),0,0.5,0); knob.Name = "WhiteSliderKnob"; knob.BackgroundColor3=Color3.fromRGB(255, 255, 255); knob.BorderSizePixel=0; knob.Parent=bar; corner(knob,20)
     local dragging=false
@@ -7923,7 +7934,7 @@ function makeMainSliderWithInput(parent,text,min,max,default,callback,suffix)
     local bar = Instance.new("Frame")
     bar.Size = UDim2.new(1,-16,0,6)
     bar.Position = UDim2.new(0,8,0,28)
-    bar.BackgroundColor3 = Theme.SliderBg
+    bar.BackgroundColor3 = Color3.fromRGB(55,55,62)
     bar.BorderSizePixel = 0
     bar.Parent = row
     corner(bar,10)
@@ -8029,14 +8040,51 @@ end
 -- CREATE PANELS
 main,mainBody=makeMainPanel("Nexus Private",UDim2.new(0,500,0,480),UDim2.new(0.5,-250,0.5,-255))
 main.Visible = false
-panels["Invisible Steal Panel"],panels["InvisStealBody"]=makeQuickPanel("Nexus Private\nInvisible Steal",UDim2.new(0,230,0,375),UDim2.new(0,80,0.5,-220))
+panels["Invisible Steal Panel"],panels["InvisStealBody"]=makeQuickPanel("Nexus Private\nInvisible Steal",UDim2.new(0,230,0,420),UDim2.new(0,80,0.5,-220))
 panels["InvisStealBody"].ScrollBarThickness = 0
+panels["InvisStealBody"].ScrollBarImageTransparency = 1
 panels["InvisStealBody"].ScrollingEnabled = false
 panels["Admin Command Panel"],panels["AdminBody"]=makeQuickPanel("Nexus Private\nAdmin Command Panel",UDim2.new(0,225,0,240),UDim2.new(0.5,85,1,-340))
 panels["Command Cooldowns"],panels["CooldownBody"]=makeQuickPanel("Nexus Private\nCommand Cooldowns",UDim2.new(0,210,0,315),UDim2.new(0.5,245,1,-390))
 panels["Actions"],panels["ActionsBody"]=makeQuickPanel("Nexus Private\nActions",UDim2.new(0,230,0,340),UDim2.new(0.5,505,1,-415))
-panels["Steal Panel"],panels["StealBody"]=makeQuickPanel("Nexus Private\nSteal Panel",UDim2.new(0,235,0,300),UDim2.new(1,-300,1,-385))
-panels["Steal Target"],panels["TargetBody"]=makeQuickPanel("Nexus Private\nSteal Target",UDim2.new(0,320,0,380),UDim2.new(1,-330,0,85))
+panels["Steal Panel"],panels["StealBody"]=makeQuickPanel("Nexus Private\nSteal Panel",UDim2.new(0,235,0,345),UDim2.new(1,-300,1,-430))
+pcall(function() for _,c in ipairs(panels["StealBody"]:GetChildren()) do if c:IsA("UIListLayout") then c.SortOrder=Enum.SortOrder.LayoutOrder end end end)
+
+-- ★ Steal 모드 선택 버튼 그룹 (Nearest / Highest / Priority)
+do
+    local modeRow=Instance.new("Frame"); modeRow.Name="StealModeRow"
+    modeRow.Size=UDim2.new(1,-4,0,34); modeRow.BackgroundTransparency=1; modeRow.LayoutOrder=0; modeRow.Parent=panels["StealBody"]
+    local modeLayout=Instance.new("UIListLayout",modeRow)
+    modeLayout.FillDirection=Enum.FillDirection.Horizontal; modeLayout.Padding=UDim.new(0,4)
+    modeLayout.HorizontalAlignment=Enum.HorizontalAlignment.Center; modeLayout.VerticalAlignment=Enum.VerticalAlignment.Center
+    local modes={"Nearest","Highest","Priority"}; local modeBtns={}
+    local function updateModeBtns(active)
+        for m,b in pairs(modeBtns) do
+            local isA=m==active
+            b.BackgroundColor3=isA and Theme.Accent or Theme.SoftAccent
+            b.BackgroundTransparency=isA and 0 or 0.15
+            b.TextColor3=isA and Color3.fromRGB(255,255,255) or Theme.Dim
+            local bs=b:FindFirstChildOfClass("UIStroke"); if bs then bs.Transparency=isA and 0.2 or 0.6 end
+        end
+    end
+    local function getCurrentMode()
+        if stealHighestEnabled then return "Highest"
+        elseif stealPriorityEnabled then return "Priority"
+        elseif stealNearestEnabled then return "Nearest" end
+        return "Highest"
+    end
+    for _,m in ipairs(modes) do
+        local b=Instance.new("TextButton",modeRow); b.Size=UDim2.new(0,63,0,28)
+        b.BackgroundColor3=Theme.SoftAccent; b.BackgroundTransparency=0.15
+        b.Text=m; b.TextColor3=Theme.Dim; b.Font=Enum.Font.GothamBold; b.TextSize=11
+        b.AutoButtonColor=false; b.BorderSizePixel=0; corner(b,7)
+        local bs=Instance.new("UIStroke",b); bs.Color=Theme.AccentLight; bs.Thickness=1.2; bs.Transparency=0.6; bs.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
+        modeBtns[m]=b
+        b.MouseButton1Click:Connect(function() setStealMode(m); updateModeBtns(m) end)
+    end
+    task.defer(function() updateModeBtns(getCurrentMode()) end)
+end
+panels["Steal Target"],panels["TargetBody"]=makeQuickPanel("Nexus Private\nSteal Target",UDim2.new(0,270,0,340),UDim2.new(1,-285,0,85))
 actionSettingsPanel,actionSettingsBody=makeQuickPanel("Nexus Private\nAction Settings",UDim2.new(0,230,0,370),UDim2.new(0.5,745,1,-440))
 actionSettingsPanel.Visible=false
 tpSpeedSettingsPanel,tpSpeedSettingsBody=makeQuickPanel("Nexus Private\nTP & Clone Settings",UDim2.new(0,235,0,440),UDim2.new(0.5,745,1,-490))
@@ -8162,23 +8210,25 @@ do
     regToggle("Auto Steal Speed", Config.AutoStealSpeed)
     regToggle("Auto Invis During Steal", Config.AutoInvisDuringSteal)
 
-    local enabledRow = makeSyncStateRow(panels["InvisStealBody"],"Enabled:","Invisible Steal",function(on) if _G.toggleInvisibleSteal then pcall(_G.toggleInvisibleSteal) end end)
+    local enabledRow = makeSyncStateRow(panels["InvisStealBody"],"Invis Steal:","Invisible Steal",function(on) if _G.toggleInvisibleSteal then pcall(_G.toggleInvisibleSteal) end end)
 
     _G.updateMovementPanelLabels = function() end
-    local rotSlider = makeQuickSlider(panels["InvisStealBody"],"Rotation",0,360,Config.InvisStealAngle or 225,function(v) _G.InvisStealAngle=v; Config.InvisStealAngle=v; saveConfig() end)
-    local depthSlider = makeQuickSlider(panels["InvisStealBody"],"Depth",0,18,Config.SinkSliderValue or 7,function(v) _G.SinkSliderValue=v; Config.SinkSliderValue=v; saveConfig() end)
-    local recoverToggle = makeSyncStateRow(panels["InvisStealBody"],"Auto Recover:","Auto Recover Lagback",function(on) _G.AutoRecoverLagback=on; Config.AutoRecoverLagback=on; saveConfig() end)
     local autoInvisToggle = makeSyncStateRow(panels["InvisStealBody"],"Auto Invis:","Auto Invis During Steal",function(on) _G.AutoInvisDuringSteal=on; Config.AutoInvisDuringSteal=on; saveConfig() end)
+    local recoverToggle = makeSyncStateRow(panels["InvisStealBody"],"Auto Recover:","Auto Recover Lagback",function(on) _G.AutoRecoverLagback=on; Config.AutoRecoverLagback=on; saveConfig() end)
+    regToggle("Unwalk", Config.Unwalk or false)
+    makeSyncStateRow(panels["InvisStealBody"],"Unwalk:","Unwalk",function(on) if _G.setUnwalk then _G.setUnwalk(on) end; Config.Unwalk=on; saveConfig() end)
 
     -- WALKSPEED CONTROL (CFrame Bypass, min 15 max 29)
     regToggle("WalkSpeed", Config.WalkSpeedEnabled)
-    makeSyncStateRow(panels["InvisStealBody"],"WalkSpeed:","WalkSpeed",function(on) setWalkSpeedEnabled(on) end)
+    makeSyncStateRow(panels["InvisStealBody"],"Walk Speed:","WalkSpeed",function(on) setWalkSpeedEnabled(on) end)
     makeMainSliderWithInput(panels["InvisStealBody"], "Walk Speed", 15, 29, Config.WalkSpeedValue or 16, function(v)
         local clamped = setWalkSpeedValue(v)
     end)
     if Config.WalkSpeedEnabled then
         task.defer(function() setWalkSpeedEnabled(true) end)
     end
+    local depthSlider = makeQuickSlider(panels["InvisStealBody"],"Depth",0,18,Config.SinkSliderValue or 7,function(v) _G.SinkSliderValue=v; Config.SinkSliderValue=v; saveConfig() end)
+    local rotSlider = makeQuickSlider(panels["InvisStealBody"],"Rotation",0,360,Config.InvisStealAngle or 225,function(v) _G.InvisStealAngle=v; Config.InvisStealAngle=v; saveConfig() end)
 
 
 -- ADMIN QUICK PANEL
@@ -8328,19 +8378,225 @@ task.spawn(function() while true do task.wait(0.5); for cmd,label in pairs(coold
 end) -- END COOLDOWN PANEL SCOPE (LazyInit)
 
 -- STEAL PANEL
-makeSyncStateRow(panels["StealBody"],"Auto Steal:","Auto Steal",function(on)
-    autoStealEnabled=on; Config.AutoStealEnabled=on; saveConfig()
-    -- SXE Clone-TP engine owns the auto-steal loop unconditionally.
-    if _G.SXEAutoSteal then pcall(_G.SXEAutoSteal, on) end
-end)
-makeSyncStateRow(panels["StealBody"],"Steal Highest:","Steal Highest",function(on) if on then setStealMode("Highest") end end)
-makeSyncStateRow(panels["StealBody"],"Steal Priority:","Steal Priority",function(on) if on then setStealMode("Priority") end end)
-makeSyncStateRow(panels["StealBody"],"Steal Nearest:","Steal Nearest",function(on) if on then setStealMode("Nearest") end end)
-makeSyncStateRow(panels["StealBody"],"Auto Buy:","Auto Buy",function(on)
-    if toggleAutoBuy then toggleAutoBuy(on)
-    else warn("[SXE] Auto Buy not ready yet -- try again in a sec") end
-end)
-makeSyncStateRow(panels["StealBody"],"Auto Kick:","Auto Kick",function(on) Config.AutoKickOnSteal=on; saveConfig() end)
+-- ── Add/Remove Features 시스템 ─────────────────────────────
+-- StealPanel: 기본 토글 없음, Add/Remove Features로만 추가
+do
+    -- 추가 가능한 전체 기능 목록 + 콜백
+    local allFeatures = {
+        -- 기본 steal 기능
+        {"Auto Steal",      function(on) autoStealEnabled=on; Config.AutoStealEnabled=on; saveConfig(); setToggle("Auto Steal",on); if _G.SXEAutoSteal then pcall(_G.SXEAutoSteal,on) end end},
+        {"Steal Highest",   function(on) if on then setStealMode("Highest") end end},
+        {"Steal Priority",  function(on) if on then setStealMode("Priority") end end},
+        {"Steal Nearest",   function(on) if on then setStealMode("Nearest") end end},
+        {"Auto Buy",        function(on) if toggleAutoBuy then toggleAutoBuy(on) end; setToggle("Auto Buy",on) end},
+        {"Auto Kick",       function(on) Config.AutoKickOnSteal=on; saveConfig(); setToggle("Auto Kick",on) end},
+        -- TP 설정
+        {"Auto TP Priority Mode", function(on) Config.AutoTPPriority=on; saveConfig() end},
+        {"Auto TP Highest Gen",   function(on) Config.AutoTPHighestGen=on; saveConfig() end},
+        {"Auto TP Highest Value", function(on) Config.AutoTPHighestValue=on; saveConfig() end},
+        {"TP on Load",            function(on) Config.TpSettings.TpOnLoad=on; saveConfig() end},
+        {"Fly TP",                function(on) Config.FlyTP=on; saveConfig() end},
+        {"Grabble TP",            function(on) Config.GrabbleTP=on; saveConfig() end},
+        -- 기타 기능
+        {"Anti Ragdoll",          function(on) if on then startAntiRagdoll() else stopAntiRagdoll() end end},
+        {"Infinite Jump",         function(on) setInfiniteJump(on) end},
+        {"Float",                 function(on) setFloat(on) end},
+        {"Carpet Speed",          function(on) setCarpetSpeed(on) end},
+        {"Unwalk",                function(on) if _G.setUnwalk then _G.setUnwalk(on) end end},
+        -- ESP
+        {"Player ESP",            function(on) playerESPEnabled=on; Config.PlayerESP=on; saveConfig(); if on then task.spawn(function() for _,pl in ipairs(Players:GetPlayers()) do if pl~=LocalPlayer then pcall(createOrRefreshPlayerESP,pl) end end end) else clearPlayerESP() end end},
+        {"Brainrot ESP",          function(on) brainrotESPEnabled=on; Config.BrainrotESP=on; saveConfig(); if on then task.spawn(function() pcall(refreshBrainrotESP) end) else clearBrainrotESP() end end},
+        {"Timer ESP",             function(on) timerESPEnabled=on; Config.TimerESP=on; saveConfig(); if on then task.spawn(function() pcall(refreshTimerESP) end) else clearTimerESP() end end},
+        -- 최근 추가
+        {"Auto Reset Balloon",    function(on) Config.AutoResetBalloon=on; saveConfig() end},
+        {"Drop Brainrot",         function(on) if _G.toggleDropBrainrot then _G.toggleDropBrainrot(on) end end},
+    }
+
+    -- 저장된 활성 기능 목록 (Config에서 불러오기)
+    if not Config.ActiveStealFeatures then
+        Config.ActiveStealFeatures = {"Auto Steal", "Steal Highest", "Steal Priority", "Steal Nearest", "Auto Buy", "Auto Kick"}
+    end
+
+    -- StealBody에 추가된 토글들 관리
+    local activeRows = {}  -- name -> Frame
+    _G._stealPanelRows = activeRows  -- 키바인드 동기화용
+
+    local function getFeatureCb(name)
+        for _,pair in ipairs(allFeatures) do
+            if pair[1]==name then return pair[2] end
+        end
+        return function() end
+    end
+
+    local function addFeatureToPanel(name)
+        if activeRows[name] then return end
+        local cb = getFeatureCb(name)
+        -- makeSyncStateRow 대신 makeMainToggle로 직접 생성하여 부모 Frame을 확실히 캡처
+        local inserted = false
+        for _, child in ipairs(panels["StealBody"]:GetChildren()) do
+            if child:IsA("Frame") and child.Name == ("_feat_"..name) then
+                inserted = true; activeRows[name] = child; break
+            end
+        end
+        if not inserted then
+            local rowFrame = Instance.new("Frame")
+            rowFrame.Name = "_feat_"..name
+            rowFrame.Size = UDim2.new(1,-4,0,28)
+            rowFrame.BackgroundTransparency = 1
+            -- LayoutOrder: 맨 아래에 추가
+            local maxOrder = 9999
+            for _,c in ipairs(panels["StealBody"]:GetChildren()) do
+                if c:IsA("Frame") and c.LayoutOrder >= maxOrder then maxOrder = c.LayoutOrder + 1 end
+            end
+            rowFrame.LayoutOrder = maxOrder
+            rowFrame.Parent = panels["StealBody"]
+            -- 라벨
+            local lbl = Instance.new("TextLabel", rowFrame)
+            lbl.Size = UDim2.new(1,-80,1,0)
+            lbl.Position = UDim2.new(0,6,0,0)
+            lbl.BackgroundTransparency = 1
+            lbl.Text = name
+            lbl.TextColor3 = Theme.Text
+            lbl.Font = Enum.Font.GothamBold
+            lbl.TextSize = 11
+            lbl.TextXAlignment = Enum.TextXAlignment.Left
+            -- 토글 버튼
+            local togBg = Instance.new("Frame", rowFrame)
+            togBg.Size = UDim2.new(0,44,0,22)
+            togBg.Position = UDim2.new(1,-50,0.5,-11)
+            togBg.BackgroundColor3 = Theme.ToggleOff
+            togBg.BorderSizePixel = 0
+            corner(togBg, 11)
+            local togKnob = Instance.new("Frame", togBg)
+            togKnob.Size = UDim2.new(0,16,0,16)
+            togKnob.Position = UDim2.new(0,3,0.5,-8)
+            togKnob.BackgroundColor3 = Color3.fromRGB(255,255,255)
+            togKnob.BorderSizePixel = 0
+            corner(togKnob, 8)
+            -- 현재 상태 가져오기
+            local togState = false
+            pcall(function()
+                local st = getToggle and getToggle(name)
+                if st ~= nil then togState = st end
+            end)
+            togBg.BackgroundColor3 = togState and Theme.Accent or Theme.ToggleOff
+            togKnob.Position = togState and UDim2.new(1,-19,0.5,-8) or UDim2.new(0,3,0.5,-8)
+            local togBtn = Instance.new("TextButton", togBg)
+            togBtn.Size = UDim2.new(1,0,1,0)
+            togBtn.BackgroundTransparency = 1
+            togBtn.Text = ""
+            togBtn.MouseButton1Click:Connect(function()
+                togState = not togState
+                togBg.BackgroundColor3 = togState and Theme.Accent or Theme.ToggleOff
+                togKnob.Position = togState and UDim2.new(1,-19,0.5,-8) or UDim2.new(0,3,0.5,-8)
+                pcall(cb, togState)
+            end)
+            activeRows[name] = rowFrame
+        end
+    end
+
+    local function removeFeatureFromPanel(name)
+        if activeRows[name] then
+            pcall(function() activeRows[name]:Destroy() end)
+            activeRows[name] = nil
+        end
+    end
+
+    -- 저장된 기능들 로드
+    for _, name in ipairs(Config.ActiveStealFeatures) do
+        addFeatureToPanel(name)
+    end
+
+    -- Add/Remove Features 패널
+    local featPanel, featBody = makeQuickPanel("Nexus Private\nFeatures", UDim2.new(0,240,0,500), UDim2.new(1,-550,1,-540))
+    featPanel.Visible = false
+
+    local function rebuildFeatPanel()
+        clearBody(featBody)
+        for _, pair in ipairs(allFeatures) do
+            local name = pair[1]
+            local isAdded = activeRows[name] ~= nil
+            local row = Instance.new("Frame")
+            row.Size = UDim2.new(1,-4,0,28)
+            row.BackgroundTransparency = 1
+            row.Parent = featBody
+
+            local lbl = Instance.new("TextLabel", row)
+            lbl.Size = UDim2.new(1,-74,1,0)
+            lbl.Position = UDim2.new(0,6,0,0)
+            lbl.BackgroundTransparency = 1
+            lbl.Text = name
+            lbl.TextColor3 = Theme.Text
+            lbl.Font = Enum.Font.GothamBold
+            lbl.TextSize = 11
+            lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+            local btn = Instance.new("TextButton", row)
+            btn.Size = UDim2.new(0,62,0,22)
+            btn.Position = UDim2.new(1,-66,0.5,-11)
+            btn.BackgroundColor3 = isAdded and Theme.Red or Theme.SoftButton
+            btn.Text = isAdded and "Remove" or "Add"
+            btn.TextColor3 = Color3.fromRGB(255,255,255)
+            btn.Font = Enum.Font.GothamBold
+            btn.TextSize = 10
+            btn.BorderSizePixel = 0
+            corner(btn, 5)
+            -- 흰 겉선 (4번째 사진 "Tp Speed" 버튼처럼)
+            local bs = Instance.new("UIStroke", btn)
+            bs.Color = Color3.fromRGB(255,255,255)
+            bs.Thickness = 1.2
+            bs.Transparency = 0.4
+            bs.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+            btn.MouseButton1Click:Connect(function()
+                if activeRows[name] then
+                    removeFeatureFromPanel(name)
+                    -- Config에서 제거
+                    for i, n in ipairs(Config.ActiveStealFeatures) do
+                        if n == name then table.remove(Config.ActiveStealFeatures, i); break end
+                    end
+                else
+                    addFeatureToPanel(name)
+                    -- Config에 추가
+                    local found = false
+                    for _, n in ipairs(Config.ActiveStealFeatures) do if n==name then found=true end end
+                    if not found then table.insert(Config.ActiveStealFeatures, name) end
+                end
+                saveConfig()
+                rebuildFeatPanel()
+            end)
+        end
+        -- Close 버튼
+        makeQuickButton(featBody, "Close", function() closeAnim(featPanel) end, Theme.SoftAccentHover)
+    end
+
+    rebuildFeatPanel()
+
+    -- Add/Remove Features 버튼 (4번째 사진 "Tp Speed"처럼 흰 겉선)
+    local arBtn = Instance.new("TextButton")
+    arBtn.Size = UDim2.new(1,-4,0,32)
+    arBtn.BackgroundColor3 = Theme.SoftButton
+    arBtn.Text = "Add/Remove Features"
+    arBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    arBtn.Font = Enum.Font.GothamBold
+    arBtn.TextSize = 12
+    arBtn.BorderSizePixel = 0
+    arBtn.AutoButtonColor = false
+    arBtn.Parent = panels["StealBody"]
+    corner(arBtn, 8)
+    -- 흰 겉선
+    local arStroke = Instance.new("UIStroke", arBtn)
+    arStroke.Color = Color3.fromRGB(255,255,255)
+    arStroke.Thickness = 1.2
+    arStroke.Transparency = 0.35
+    arStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+    arBtn.MouseEnter:Connect(function() arBtn.BackgroundColor3 = Theme.SoftAccentHover end)
+    arBtn.MouseLeave:Connect(function() arBtn.BackgroundColor3 = Theme.SoftButton end)
+    arBtn.MouseButton1Click:Connect(function()
+        if featPanel.Visible then closeAnim(featPanel) else openAnim(featPanel) end
+    end)
+end
 
 
 
@@ -8753,8 +9009,9 @@ local tabs={"Keybinds","Main","Misc","Priority"}
 local _sbScroll=_G._mainSidebarScroll
 if _sbScroll then
     for _,tabName in ipairs(tabs) do
-        local btn=Instance.new("TextButton"); btn.Size=UDim2.new(1,-6,0,38); btn.BackgroundColor3=Color3.fromRGB(15,30,70); btn.BackgroundTransparency=0.05; btn.BorderSizePixel=0; btn.Text=tabName; btn.TextColor3=Color3.fromRGB(255,255,255); btn.Font=Enum.Font.GothamBold; btn.TextSize=12; btn.AutoButtonColor=true; btn.Parent=_sbScroll; corner(btn,6)
-        local sbStroke2=Instance.new("UIStroke"); sbStroke2.Color=Color3.fromRGB(255,255,255); sbStroke2.Thickness=0.5; sbStroke2.Transparency=0.4; sbStroke2.ApplyStrokeMode=Enum.ApplyStrokeMode.Border; sbStroke2.Parent=btn
+        local btn=Instance.new("TextButton"); btn.Size=UDim2.new(1,0,0,36); btn.BackgroundColor3=Color3.fromRGB(48,50,58); btn.BackgroundTransparency=0.08; btn.BorderSizePixel=0; btn.Text=tabName; btn.TextColor3=Color3.fromRGB(190,190,200); btn.Font=Enum.Font.GothamBold; btn.TextSize=12; btn.AutoButtonColor=false; btn.Parent=_sbScroll; corner(btn,7)
+        btn.MouseEnter:Connect(function() if btn.BackgroundColor3~=Color3.fromRGB(70,72,85) then tw(btn,{BackgroundColor3=Color3.fromRGB(62,64,74),TextColor3=Color3.fromRGB(230,230,240)},0.1) end end)
+        btn.MouseLeave:Connect(function() if btn.BackgroundColor3~=Color3.fromRGB(70,72,85) then tw(btn,{BackgroundColor3=Color3.fromRGB(48,50,58),TextColor3=Color3.fromRGB(190,190,200)},0.1) end end)
         tabButtons[tabName]=btn
     end
 end
@@ -8876,7 +9133,7 @@ function makePriorityAddRow()
     local dropdown = Instance.new("Frame"); dropdown.Name="PriorityDropdown"; dropdown.Size=UDim2.new(1,-60,0,0); dropdown.Position=UDim2.new(0,6,1,2)
     dropdown.BackgroundColor3=Theme.Background; dropdown.BorderSizePixel=0; dropdown.ClipsDescendants=true; dropdown.Visible=false; dropdown.ZIndex=50; dropdown.Parent=holder; corner(dropdown,6)
     local ddStroke = Instance.new("UIStroke"); ddStroke.Color=Theme.AccentLight; ddStroke.Thickness=1; ddStroke.Parent=dropdown
-    local ddScroll = Instance.new("ScrollingFrame"); ddScroll.Size=UDim2.new(1,0,1,0); ddScroll.BackgroundTransparency=1; ddScroll.BorderSizePixel=0; ddScroll.ScrollBarThickness=3; ddScroll.ScrollBarImageColor3=Theme.Accent; ddScroll.CanvasSize=UDim2.new(0,0,0,0); ddScroll.Active=true; ddScroll.ZIndex=51; ddScroll.Parent=dropdown
+    local ddScroll = Instance.new("ScrollingFrame"); ddScroll.Size=UDim2.new(1,0,1,0); ddScroll.BackgroundTransparency=1; ddScroll.BorderSizePixel=0; ddScroll.ScrollBarThickness=3; ddScroll.ScrollBarImageColor3=Theme.Accent; ddScroll.ScrollBarImageTransparency=1; ddScroll.CanvasSize=UDim2.new(0,0,0,0); ddScroll.Active=true; ddScroll.ZIndex=51; ddScroll.Parent=dropdown
     local ddLayout = Instance.new("UIListLayout"); ddLayout.Padding=UDim.new(0,1); ddLayout.Parent=ddScroll
     ddLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() ddScroll.CanvasSize=UDim2.new(0,0,0,ddLayout.AbsoluteContentSize.Y) end)
 
@@ -8952,7 +9209,10 @@ end
 function loadTab(tabName)
     UI.CurrentTab=tabName; clearBody(mainBody)
     pcall(function() mainBody:FindFirstChildOfClass("UIListLayout").SortOrder = Enum.SortOrder.LayoutOrder end)
-    for name,btn in pairs(tabButtons) do btn.BackgroundColor3=name==tabName and Color3.fromRGB(25,55,130) or Color3.fromRGB(15,30,70) end
+    for name,btn in pairs(tabButtons) do
+        if name==tabName then btn.BackgroundColor3=Color3.fromRGB(70,72,85); btn.TextColor3=Color3.fromRGB(255,255,255)
+        else btn.BackgroundColor3=Color3.fromRGB(48,50,58); btn.TextColor3=Color3.fromRGB(190,190,200) end
+    end
 
     if tabName=="Keybinds" then
         for _,name in ipairs({"Kick","Rejoin Job ID","Clone","Manual TP","Invisible Steal","Job ID","Proximity","Carpet Boost","Open Menu","Ragdoll Self","Drop Brainrot","Float","Reset","Auto Buy","Click to AP"}) do makeKeybindRow(mainBody,name) end
@@ -8960,13 +9220,15 @@ function loadTab(tabName)
     elseif tabName=="Main" then
         local function makeCollapsibleBar(parent, titleText, defaultOpen)
             local container=Instance.new("Frame"); container.Size=UDim2.new(1,-4,0,0); container.AutomaticSize=Enum.AutomaticSize.Y; container.BackgroundTransparency=1; container.Parent=parent
-            local barBtn=Instance.new("TextButton"); barBtn.Size=UDim2.new(1,0,0,28); barBtn.BackgroundColor3=Color3.fromRGB(28,30,38); barBtn.BackgroundTransparency=0.1; barBtn.Text=""; barBtn.AutoButtonColor=false; barBtn.Parent=container; corner(barBtn,6)
-            local barStroke=Instance.new("UIStroke"); barStroke.Color=Color3.fromRGB(255,255,255); barStroke.Thickness=0.5; barStroke.Transparency=0.4; barStroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Border; barStroke.Parent=barBtn
-            local barLabel=Instance.new("TextLabel"); barLabel.Size=UDim2.new(1,-30,1,0); barLabel.Position=UDim2.new(0,10,0,0); barLabel.BackgroundTransparency=1; barLabel.Text=titleText; barLabel.TextColor3=Color3.fromRGB(255,255,255); barLabel.Font=Enum.Font.GothamBold; barLabel.TextSize=12; barLabel.TextXAlignment=Enum.TextXAlignment.Left; barLabel.Parent=barBtn
+            local cLayout=Instance.new("UIListLayout"); cLayout.SortOrder=Enum.SortOrder.LayoutOrder; cLayout.Padding=UDim.new(0,0); cLayout.Parent=container
+            local barBtn=Instance.new("TextButton"); barBtn.Size=UDim2.new(1,0,0,28); barBtn.LayoutOrder=1; barBtn.BackgroundColor3=Color3.fromRGB(45,47,56); barBtn.BackgroundTransparency=0.08; barBtn.Text=""; barBtn.AutoButtonColor=false; barBtn.Parent=container; corner(barBtn,7)
+            barBtn.MouseEnter:Connect(function() tw(barBtn,{BackgroundColor3=Color3.fromRGB(58,60,72)},0.12) end)
+            barBtn.MouseLeave:Connect(function() tw(barBtn,{BackgroundColor3=Color3.fromRGB(45,47,56)},0.12) end)
+            local barLabel=Instance.new("TextLabel"); barLabel.Size=UDim2.new(1,-30,1,0); barLabel.Position=UDim2.new(0,10,0,0); barLabel.BackgroundTransparency=1; barLabel.Text=titleText; barLabel.TextColor3=Color3.fromRGB(215,215,225); barLabel.Font=Enum.Font.GothamBold; barLabel.TextSize=12; barLabel.TextXAlignment=Enum.TextXAlignment.Left; barLabel.Parent=barBtn
             local arrowLbl=Instance.new("TextLabel"); arrowLbl.Size=UDim2.new(0,20,1,0); arrowLbl.Position=UDim2.new(1,-24,0,0); arrowLbl.BackgroundTransparency=1; arrowLbl.Text=defaultOpen and "▼" or "▶"; arrowLbl.TextColor3=Color3.fromRGB(180,180,180); arrowLbl.Font=Enum.Font.GothamBold; arrowLbl.TextSize=10; arrowLbl.Parent=barBtn
-            local contentFrame=Instance.new("Frame"); contentFrame.Size=UDim2.new(1,0,0,0); contentFrame.AutomaticSize=Enum.AutomaticSize.Y; contentFrame.BackgroundTransparency=1; contentFrame.Visible=defaultOpen; contentFrame.Parent=container
-            local contentPad=Instance.new("UIPadding"); contentPad.PaddingTop=UDim.new(0,6); contentPad.PaddingBottom=UDim.new(0,2); contentPad.PaddingLeft=UDim.new(0,2); contentPad.PaddingRight=UDim.new(0,2); contentPad.Parent=contentFrame
-            local contentLayout=Instance.new("UIListLayout"); contentLayout.Padding=UDim.new(0,6); contentLayout.Parent=contentFrame
+            local contentFrame=Instance.new("Frame"); contentFrame.Size=UDim2.new(1,0,0,0); contentFrame.AutomaticSize=Enum.AutomaticSize.Y; contentFrame.BackgroundTransparency=1; contentFrame.Visible=defaultOpen; contentFrame.LayoutOrder=2; contentFrame.Parent=container
+            local contentPad=Instance.new("UIPadding"); contentPad.PaddingTop=UDim.new(0,5); contentPad.PaddingBottom=UDim.new(0,3); contentPad.PaddingLeft=UDim.new(0,2); contentPad.PaddingRight=UDim.new(0,2); contentPad.Parent=contentFrame
+            local contentLayout=Instance.new("UIListLayout"); contentLayout.SortOrder=Enum.SortOrder.LayoutOrder; contentLayout.Padding=UDim.new(0,6); contentLayout.Parent=contentFrame
             barBtn.MouseButton1Click:Connect(function()
                 contentFrame.Visible=not contentFrame.Visible
                 arrowLbl.Text=contentFrame.Visible and "▼" or "▶"
@@ -9006,6 +9268,10 @@ function loadTab(tabName)
             saveConfig()
         end)
         makeMainToggle(tpSection,"TP on Load",Config.TpSettings.TpOnLoad,function(on) Config.TpSettings.TpOnLoad=on; saveConfig() end)
+        makeMainToggle(tpSection,"TP Line",Config.TpSettings.TpLine or false,function(on)
+            Config.TpSettings.TpLine=on; saveConfig()
+            if not on and _G._tpLineBeam then pcall(function() _G._tpLineBeam:Destroy() end); _G._tpLineBeam=nil end
+        end)
         local flyGearsSection=makeCollapsibleBar(tpSection,"Fly Gears",false)
         local toolOptions={"Flying Carpet","Cupid's Wings","Santa's Sleigh","Witch's Broom","Waverider"}
         local toolToggles={}
@@ -9017,7 +9283,7 @@ function loadTab(tabName)
                 end
             end)
         end
-        makeMainButton(tpSection, "Tp Speed", function()
+        makeMainButton(tpSection, "TP Settings", function()
             if tpSpeedSettingsPanel.Visible then closeAnim(tpSpeedSettingsPanel) else openAnim(tpSpeedSettingsPanel) end
         end, Theme.Panel)
 
@@ -9431,7 +9697,7 @@ function loadTab(tabName)
                 end
             end
         end)
-        makeMainTextBox(mainBody,"Min Gen for Nearest Grab",Config.TpSettings.MinGenForGrab,"e.g. 10k, 500k, 1m",function(v)
+        makeMainTextBox(mainBody,"Minimum Nearest Grab",Config.TpSettings.MinGenForGrab,"e.g. 10k, 500k, 1m",function(v)
             Config.TpSettings.MinGenForGrab = v
             saveConfig()
             ShowNotification("MIN GEN GRAB", v == "" and "No minimum" or "Min: " .. v)
@@ -9439,8 +9705,7 @@ function loadTab(tabName)
 
     
         -- Performance features (moved from Performance tab)
-        makeSyncMainToggle(mainBody,"FPS Boost (normal)","FPS Boost (normal)",function(on) setFPSBoost(on) end)
-        makeSyncMainToggle(mainBody,"FPS Boost Ultra","FPSBoostUltra",function(on) setFPSBoostUltra(on) end)
+        makeSyncMainToggle(mainBody,"FPS Boost","FPSBoostUltra",function(on) setFPSBoostUltra(on) end)
         makeSyncMainToggle(mainBody,"Xray","XRay",function(on) setXRay(on) end)
         makeQuickSlider(mainBody,"FOV",50,120,Config.FOV or 70,function(v) Config.FOV=v; saveConfig(); pcall(function() Workspace.CurrentCamera.FieldOfView=v end) end)
 
@@ -9470,10 +9735,10 @@ _G.updateLogoImage = function(isDark)
     iw.BackgroundColor3 = Theme.SoftAccent
 end
 _G.updateLogoImage(Config and Config.DarkMode or false)
-local lg=Instance.new("TextLabel"); lg.Size=UDim2.new(0,120,0,26); lg.Position=UDim2.new(0,54,0,5); lg.BackgroundTransparency=1; lg.Text="Nexus Private"; lg.TextColor3=Color3.fromRGB(255,215,0); lg.Font=Enum.Font.GothamBlack; lg.TextSize=19; lg.TextXAlignment=Enum.TextXAlignment.Left; lg.Parent=bottomBar; local lgGrad=Instance.new("UIGradient"); lgGrad.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(255,180,0)),ColorSequenceKeypoint.new(0.3,Color3.fromRGB(255,235,150)),ColorSequenceKeypoint.new(0.5,Color3.fromRGB(255,255,220)),ColorSequenceKeypoint.new(0.7,Color3.fromRGB(255,235,150)),ColorSequenceKeypoint.new(1,Color3.fromRGB(255,180,0))}); lgGrad.Rotation=45; lgGrad.Parent=lg; task.spawn(function() while true do for i=0,200 do lgGrad.Offset=Vector2.new(-1+i/100,-1+i/100); task.wait(0.01) end; task.wait(0.3) end end)
-local dd=Instance.new("TextLabel"); dd.Size=UDim2.new(0,20,0,26); dd.Position=UDim2.new(0,178,0,5); dd.BackgroundTransparency=1; dd.Text="|"; dd.TextColor3=Theme.AccentLight; dd.Font=Enum.Font.GothamBlack; dd.TextSize=18; dd.Parent=bottomBar
-local dc=Instance.new("TextLabel"); dc.Size=UDim2.new(0,110,0,26); dc.Position=UDim2.new(0,194,0,5); dc.BackgroundTransparency=1; dc.Text=".gg/NexusHub"; dc.TextColor3=Color3.fromRGB(255,215,0); dc.Font=Enum.Font.GothamBold; dc.TextSize=16; dc.TextXAlignment=Enum.TextXAlignment.Left; dc.Parent=bottomBar; local dcGrad=Instance.new("UIGradient"); dcGrad.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(255,180,0)),ColorSequenceKeypoint.new(0.3,Color3.fromRGB(255,235,150)),ColorSequenceKeypoint.new(0.5,Color3.fromRGB(255,255,220)),ColorSequenceKeypoint.new(0.7,Color3.fromRGB(255,235,150)),ColorSequenceKeypoint.new(1,Color3.fromRGB(255,180,0))}); dcGrad.Rotation=45; dcGrad.Parent=dc; task.spawn(function() while true do for i=0,200 do dcGrad.Offset=Vector2.new(-1+i/100,-1+i/100); task.wait(0.01) end; task.wait(0.3) end end)
-local sb=Instance.new("TextLabel"); sb.Size=UDim2.new(0,280,0,17); sb.Position=UDim2.new(0,55,0,30); sb.BackgroundTransparency=1; sb.Text="Developer: jxn5e_, udai_7"; sb.TextColor3=Theme.Dim; sb.Font=Enum.Font.GothamSemibold; sb.TextSize=10; sb.TextXAlignment=Enum.TextXAlignment.Left; sb.Parent=bottomBar
+local lg=Instance.new("TextLabel"); lg.Size=UDim2.new(0,108,0,26); lg.Position=UDim2.new(0,54,0,5); lg.BackgroundTransparency=1; lg.Text="Nexus Private"; lg.TextColor3=Color3.fromRGB(255,215,0); lg.Font=Enum.Font.GothamBlack; lg.TextSize=16; lg.TextXAlignment=Enum.TextXAlignment.Left; lg.Parent=bottomBar; local lgGrad=Instance.new("UIGradient"); lgGrad.Rotation=0; lgGrad.Parent=lg; do local _s=tick(); local _c; _c=RunService.Heartbeat:Connect(function() if not lg or not lg.Parent then _c:Disconnect(); return end; local t=((tick()-_s)%2)/2; local lo=math.clamp(t-0.14,0.01,0.83); local hi=math.clamp(t+0.14,0.17,0.99); lgGrad.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(255,185,10)),ColorSequenceKeypoint.new(lo,Color3.fromRGB(255,235,90)),ColorSequenceKeypoint.new(math.clamp(t,0.04,0.96),Color3.fromRGB(255,255,200)),ColorSequenceKeypoint.new(hi,Color3.fromRGB(255,235,90)),ColorSequenceKeypoint.new(1,Color3.fromRGB(230,160,5))}); end) end
+local dc=Instance.new("TextLabel"); dc.Size=UDim2.new(0,160,0,14); dc.Position=UDim2.new(0,55,0,32); dc.BackgroundTransparency=1; dc.Text=".gg/NexusHub"; dc.Font=Enum.Font.GothamBold; dc.TextSize=13; dc.TextXAlignment=Enum.TextXAlignment.Left; dc.Parent=bottomBar; local dcGrad=Instance.new("UIGradient"); dcGrad.Rotation=0; dcGrad.Parent=dc; do local _sd=tick(); local _cd; _cd=RunService.Heartbeat:Connect(function() if not dc or not dc.Parent then _cd:Disconnect(); return end; local t=((tick()-_sd)%2)/2; local lo=math.clamp(t-0.14,0.01,0.83); local hi=math.clamp(t+0.14,0.17,0.99); dcGrad.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(255,185,10)),ColorSequenceKeypoint.new(lo,Color3.fromRGB(255,235,90)),ColorSequenceKeypoint.new(math.clamp(t,0.04,0.96),Color3.fromRGB(255,255,200)),ColorSequenceKeypoint.new(hi,Color3.fromRGB(255,235,90)),ColorSequenceKeypoint.new(1,Color3.fromRGB(230,160,5))}); end) end
+-- discord link removed
+-- Developer label removed (dc occupies this row)
 local rightDiv=Instance.new("Frame"); rightDiv.Size=UDim2.new(0,1,0,36); rightDiv.Position=UDim2.new(1,-138,0.5,-18); rightDiv.BackgroundColor3=Theme.Accent; rightDiv.BackgroundTransparency=0.35; rightDiv.BorderSizePixel=0; rightDiv.Parent=bottomBar
 fpsText=Instance.new("TextLabel"); fpsText.Size=UDim2.new(0,126,1,0); fpsText.Position=UDim2.new(1,-128,0,0); fpsText.BackgroundTransparency=1; fpsText.RichText=true; fpsText.Text="FPS: --\nPING: --ms"; fpsText.TextColor3=Theme.Green; fpsText.Font=Enum.Font.GothamBold; fpsText.TextSize=10; fpsText.TextXAlignment=Enum.TextXAlignment.Left; fpsText.Parent=bottomBar
 bottomBar.Visible = true
@@ -9507,7 +9772,19 @@ UIS.InputBegan:Connect(function(input,gp) if gp then return end; if input.UserIn
     local actions={
         ["Drop Brainrot"]=runDropBrainrot, ["Clone"]=instantClone,
         ["Float"]=function() setFloat(not FloatState.active) end,
-        ["Carpet Boost"]=function() setCarpetSpeed(not CarpetState.enabled) end,
+        ["Carpet Boost"]=function() setCarpetSpeed(not CarpetState.enabled); -- Add/Remove Features 패널의 Carpet Speed 토글도 동기화
+        pcall(function()
+            if _G._stealPanelRows and _G._stealPanelRows["Carpet Speed"] then
+                local row = _G._stealPanelRows["Carpet Speed"]
+                local togBg = row:FindFirstChild("Frame")
+                local togKnob = togBg and togBg:FindFirstChild("Frame")
+                if togBg and togKnob then
+                    togBg.BackgroundColor3 = CarpetState.enabled and Theme.Accent or Theme.ToggleOff
+                    togKnob.Position = CarpetState.enabled and UDim2.new(1,-19,0.5,-8) or UDim2.new(0,3,0.5,-8)
+                end
+            end
+        end)
+        end,
         ["Reset"]=executeReset, ["Kick"]=kickPlayer,
         ["Proximity"]=function() ProximityAPActive=not ProximityAPActive; setToggle("Proximity",ProximityAPActive) end,
         ["Ragdoll Self"]=function() pcall(runAdminCommand,player,"ragdoll") end,
@@ -9521,6 +9798,39 @@ UIS.InputBegan:Connect(function(input,gp) if gp then return end; if input.UserIn
             setToggle("Click to AP", Config.ClickToAP)
             setToggle("ClickToAP", Config.ClickToAP)
             ShowNotification("CLICK TO AP", Config.ClickToAP and "Enabled" or "Disabled")
+        end,
+        ["Auto Steal"]=function()
+            autoStealEnabled = not autoStealEnabled
+            Config.AutoStealEnabled = autoStealEnabled
+            saveConfig()
+            setToggle("Auto Steal", autoStealEnabled)
+            if _G.SXEAutoSteal then pcall(_G.SXEAutoSteal, autoStealEnabled) end
+        end,
+        ["Auto Kick"]=function()
+            Config.AutoKickOnSteal = not Config.AutoKickOnSteal
+            saveConfig()
+            setToggle("Auto Kick", Config.AutoKickOnSteal)
+        end,
+        ["Auto Invis"]=function()
+            Config.AutoInvis = not Config.AutoInvis
+            saveConfig()
+            setToggle("Auto Invis", Config.AutoInvis)
+        end,
+        ["Auto Recover"]=function()
+            Config.AutoRecover = not Config.AutoRecover
+            saveConfig()
+            setToggle("Auto Recover", Config.AutoRecover)
+        end,
+        ["Invis Steal"]=function()
+            if _G.toggleInvisibleSteal then pcall(_G.toggleInvisibleSteal) end
+            setToggle("Invis Steal", _G.invisibleStealEnabled or false)
+        end,
+        ["Walk Speed"]=function()
+            if setWalkSpeedEnabled then
+                local newState = not (WalkSpeedState and WalkSpeedState.enabled)
+                setWalkSpeedEnabled(newState)
+                setToggle("WalkSpeed", newState)
+            end
         end,
     }
     for actionName,keyBind in pairs(Keybinds) do if keyBind==kn and actions[actionName] then actions[actionName](); return end end
@@ -10656,6 +10966,30 @@ do
         if rootPart and rootPart.Parent then lvStop(rootPart) end
     end
 
+    local function showTPLine(fromPos, toPos)
+        if not (Config.TpSettings and Config.TpSettings.TpLine) then return end
+        task.spawn(function()
+            pcall(function()
+                if _G._tpLineBeam then _G._tpLineBeam:Destroy(); _G._tpLineBeam=nil end
+                local folder=Instance.new("Folder"); folder.Parent=workspace
+                local a0=Instance.new("Attachment"); a0.WorldPosition=fromPos; a0.Parent=workspace.Terrain
+                local a1=Instance.new("Attachment"); a1.WorldPosition=toPos; a1.Parent=workspace.Terrain
+                local beam=Instance.new("Beam")
+                beam.Attachment0=a0; beam.Attachment1=a1
+                beam.Color=ColorSequence.new(Color3.fromRGB(80,160,255))
+                beam.Width0=0.08; beam.Width1=0.08
+                beam.Transparency=NumberSequence.new(0.2)
+                beam.LightEmission=0.8; beam.LightInfluence=0
+                beam.Parent=folder
+                _G._tpLineBeam=folder
+                task.delay(5,function()
+                    pcall(function() folder:Destroy() end)
+                    if _G._tpLineBeam==folder then _G._tpLineBeam=nil end
+                end)
+            end)
+        end)
+    end
+
     local function goToBrainrot(petPos)
         if not petPos then return end
         local char, hrp
@@ -11342,7 +11676,7 @@ do
 
         -- Clone success verification (preserved from Source 2)
         if _cloneOk then
-            task.wait(0.3)
+            -- ★ 대기 제거: 클론 후 바로 브레인롯으로 이동
             local _cloneSucceeded = false
             do
                 local _c = LP.Character
@@ -11363,6 +11697,9 @@ do
                 end
             end
             if _cloneSucceeded then
+                -- TP Line 표시
+                local _lhrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+                if _lhrp then pcall(showTPLine, _lhrp.Position, petPos) end
                 goToBrainrot(petPos)
                 pcall(function()
                     local vim = Instance.new("VirtualInputManager")
@@ -11405,4 +11742,37 @@ do
         _started = true
     end)
 end
+-- ── Update Log 버튼 (우측 하단) ──
+do
+    local ulGui=Instance.new("ScreenGui"); ulGui.Name="NexusUpdateLog"; ulGui.ResetOnSpawn=false; ulGui.IgnoreGuiInset=true; ulGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
+    pcall(function() ulGui.Parent=(gethui and gethui()) or game:GetService("CoreGui") end)
+    if not ulGui.Parent then ulGui.Parent=player:WaitForChild("PlayerGui") end
 
+    local ulBtn=Instance.new("TextButton"); ulBtn.Size=UDim2.new(0,110,0,26); ulBtn.Position=UDim2.new(1,-118,1,-36)
+    ulBtn.BackgroundColor3=Color3.fromRGB(18,18,22); ulBtn.BackgroundTransparency=0.1; ulBtn.Text="Update Log"
+    ulBtn.TextColor3=Color3.fromRGB(200,200,210); ulBtn.Font=Enum.Font.GothamBold; ulBtn.TextSize=11
+    ulBtn.BorderSizePixel=0; ulBtn.AutoButtonColor=false; ulBtn.Parent=ulGui; corner(ulBtn,6)
+    local ulBtnS=Instance.new("UIStroke",ulBtn); ulBtnS.Color=Color3.fromRGB(255,255,255); ulBtnS.Thickness=1.0; ulBtnS.Transparency=0.55; ulBtnS.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
+    ulBtn.MouseEnter:Connect(function() tw(ulBtn,{BackgroundColor3=Color3.fromRGB(30,30,38)},0.1) end)
+    ulBtn.MouseLeave:Connect(function() tw(ulBtn,{BackgroundColor3=Color3.fromRGB(18,18,22)},0.1) end)
+
+    local ulPanel=Instance.new("Frame"); ulPanel.Size=UDim2.new(0,280,0,260); ulPanel.Position=UDim2.new(1,-298,1,-306)
+    ulPanel.BackgroundColor3=Color3.fromRGB(14,14,18); ulPanel.BackgroundTransparency=0.05; ulPanel.BorderSizePixel=0; ulPanel.Visible=false; ulPanel.Parent=ulGui; corner(ulPanel,12)
+    local ulPS=Instance.new("UIStroke",ulPanel); ulPS.Color=Color3.fromRGB(255,255,255); ulPS.Thickness=1.0; ulPS.Transparency=0.5; ulPS.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
+
+    local ulHdr=Instance.new("Frame",ulPanel); ulHdr.Size=UDim2.new(1,0,0,40); ulHdr.BackgroundColor3=Color3.fromRGB(20,20,26); ulHdr.BorderSizePixel=0; corner(ulHdr,12)
+    local ulHFix=Instance.new("Frame",ulHdr); ulHFix.Size=UDim2.new(1,0,0,12); ulHFix.Position=UDim2.new(0,0,1,-12); ulHFix.BackgroundColor3=Color3.fromRGB(20,20,26); ulHFix.BorderSizePixel=0
+    local ulHDiv=Instance.new("Frame",ulHdr); ulHDiv.Size=UDim2.new(1,0,0,1); ulHDiv.Position=UDim2.new(0,0,1,-1); ulHDiv.BackgroundColor3=Color3.fromRGB(255,255,255); ulHDiv.BackgroundTransparency=0.75; ulHDiv.BorderSizePixel=0
+    local ulT=Instance.new("TextLabel",ulHdr); ulT.Size=UDim2.new(1,-40,1,0); ulT.Position=UDim2.new(0,14,0,0); ulT.BackgroundTransparency=1; ulT.Text="Update Log  v1.1"; ulT.TextColor3=Color3.fromRGB(255,225,70); ulT.Font=Enum.Font.GothamBlack; ulT.TextSize=14; ulT.TextXAlignment=Enum.TextXAlignment.Left
+    local ulX=Instance.new("TextButton",ulHdr); ulX.Size=UDim2.new(0,22,0,22); ulX.Position=UDim2.new(1,-28,0.5,-11); ulX.BackgroundColor3=Color3.fromRGB(30,30,38); ulX.BorderSizePixel=0; ulX.Text="✕"; ulX.TextColor3=Color3.fromRGB(160,160,170); ulX.Font=Enum.Font.GothamBold; ulX.TextSize=11; ulX.AutoButtonColor=false; corner(ulX,6)
+    ulX.MouseButton1Click:Connect(function() ulPanel.Visible=false end)
+
+    local ulScroll=Instance.new("ScrollingFrame",ulPanel); ulScroll.Size=UDim2.new(1,-16,1,-52); ulScroll.Position=UDim2.new(0,8,0,46); ulScroll.BackgroundTransparency=1; ulScroll.BorderSizePixel=0; ulScroll.ScrollBarThickness=3; ulScroll.CanvasSize=UDim2.new(0,0,0,0); ulScroll.AutomaticCanvasSize=Enum.AutomaticSize.Y
+    local ulLL=Instance.new("UIListLayout",ulScroll); ulLL.Padding=UDim.new(0,5); ulLL.SortOrder=Enum.SortOrder.LayoutOrder
+
+    for i,txt in ipairs({"1.  Added Update Logs","2.  Improved TP","3.  Fixed TP to brainrots","4.  Added TP Line","5.  Improved FPS Boost","6.  Removed Auto Turret"}) do
+        local row=Instance.new("TextLabel",ulScroll); row.Size=UDim2.new(1,0,0,30); row.BackgroundColor3=Color3.fromRGB(22,22,28); row.BackgroundTransparency=i%2==0 and 0.3 or 0.0; row.BorderSizePixel=0; row.Text="  "..txt; row.TextColor3=Color3.fromRGB(210,210,220); row.Font=Enum.Font.GothamSemibold; row.TextSize=12; row.TextXAlignment=Enum.TextXAlignment.Left; row.LayoutOrder=i; corner(row,5)
+    end
+
+    ulBtn.MouseButton1Click:Connect(function() ulPanel.Visible=not ulPanel.Visible end)
+end
