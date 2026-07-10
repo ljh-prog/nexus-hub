@@ -268,13 +268,82 @@ local function getRobloxUserInfo()
 end
 
 local function forceKick(message)
-    print("[Nexus] 🚫 Kicking: " .. tostring(message))
-    pcall(function()
+    print("[Nexus] 🚫 Disconnect: " .. tostring(message))
+
+    -- 1) 서버 권한이 있는 실행기라면 Player:Kick()이 로벅스 자체 종료 화면을 띄워줌
+    local kicked = pcall(function()
         game.Players.LocalPlayer:Kick(message)
     end)
-    task.wait(0.3)
+
+    -- 2) Kick이 안 먹히는 실행기 대비 — 로벅스의 "연결 끊김" 화면을 흉내낸 UI를
+    --    직접 띄우고, 플레이어가 내용을 읽은 뒤 스스로 "나가기"를 누르게 함
+    --    (자동으로 game:Shutdown()을 호출하지 않음 — 그러면 메시지를 읽을 새도 없이 튕김)
     pcall(function()
-        game:Shutdown()
+        local Players = game:GetService("Players")
+        local player = Players.LocalPlayer
+        if not player then return end
+
+        local gui = Instance.new("ScreenGui")
+        gui.Name = "RobloxDisconnectOverlay"
+        gui.ResetOnSpawn = false
+        gui.IgnoreGuiInset = true
+        gui.DisplayOrder = 2147483647
+
+        local bg = Instance.new("Frame")
+        bg.Size = UDim2.new(1, 0, 1, 0)
+        bg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        bg.BackgroundTransparency = 0
+        bg.BorderSizePixel = 0
+        bg.Parent = gui
+
+        local icon = Instance.new("TextLabel")
+        icon.BackgroundTransparency = 1
+        icon.Size = UDim2.new(0, 64, 0, 64)
+        icon.Position = UDim2.new(0.5, -32, 0.32, -32)
+        icon.Text = "⚠"
+        icon.TextColor3 = Color3.fromRGB(255, 255, 255)
+        icon.Font = Enum.Font.SourceSansBold
+        icon.TextSize = 48
+        icon.Parent = bg
+
+        local title = Instance.new("TextLabel")
+        title.BackgroundTransparency = 1
+        title.Size = UDim2.new(1, 0, 0, 40)
+        title.Position = UDim2.new(0, 0, 0.42, 0)
+        title.Text = "Disconnected"
+        title.Font = Enum.Font.SourceSansBold
+        title.TextSize = 30
+        title.TextColor3 = Color3.fromRGB(255, 255, 255)
+        title.Parent = bg
+
+        local msg = Instance.new("TextLabel")
+        msg.BackgroundTransparency = 1
+        msg.Size = UDim2.new(0.7, 0, 0, 120)
+        msg.Position = UDim2.new(0.15, 0, 0.5, 0)
+        msg.Text = tostring(message)
+        msg.TextWrapped = true
+        msg.Font = Enum.Font.SourceSans
+        msg.TextSize = 20
+        msg.TextColor3 = Color3.fromRGB(210, 210, 210)
+        msg.Parent = bg
+
+        local leaveBtn = Instance.new("TextButton")
+        leaveBtn.Size = UDim2.new(0, 220, 0, 44)
+        leaveBtn.Position = UDim2.new(0.5, -110, 0.68, 0)
+        leaveBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+        leaveBtn.Text = "Leave Game"
+        leaveBtn.Font = Enum.Font.SourceSansBold
+        leaveBtn.TextSize = 20
+        leaveBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        leaveBtn.AutoButtonColor = true
+        leaveBtn.Parent = bg
+
+        leaveBtn.MouseButton1Click:Connect(function()
+            pcall(function() game:Shutdown() end)
+        end)
+
+        local playerGui = player:FindFirstChildOfClass("PlayerGui")
+        gui.Parent = playerGui or game:GetService("CoreGui")
     end)
 end
 
