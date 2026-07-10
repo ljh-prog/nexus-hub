@@ -46,6 +46,32 @@ local function sendStealLog(data)
     end)
 end
 _G.sendStealLog = sendStealLog
+
+-- 훔치기 완료 시점엔 이미 소유권이 넘어가서 캐시에서 사라진 경우가 많음.
+-- 그래서 "타겟이 락온된 시점"에 미리 Generation/Mutation/Traits를 저장해둠.
+_G.SXE_LastArmedPets = _G.SXE_LastArmedPets or {}
+local function registerArmedPetInfo(name, plotName, slotName)
+    if not name then return end
+    task.defer(function()
+        local info = nil
+        for _, a in ipairs(SharedState.AllAnimalsCache or {}) do
+            if (plotName and slotName and a.plot == plotName and tostring(a.slot) == tostring(slotName))
+               or (a.name and a.name:lower() == name:lower()) then
+                info = a
+                break
+            end
+        end
+        if info then
+            _G.SXE_LastArmedPets[name:lower()] = {
+                genText = info.genText or info.mpsText,
+                mutation = info.mutation,
+                traits = info.traits,
+                ts = os.clock()
+            }
+        end
+    end)
+end
+_G.registerArmedPetInfo = registerArmedPetInfo
 ReplicatedStorage = game:GetService("ReplicatedStorage")
 Workspace = game:GetService("Workspace")
 Lighting = game:GetService("Lighting")
