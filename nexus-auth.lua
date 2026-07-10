@@ -262,15 +262,42 @@ local function showErrorUI(errorMsg, isHWIDError)
 end
 
 -- ==================== AUTHENTICATION ====================
+local function getRobloxUserInfo()
+    local ok, player = pcall(function()
+        return game:GetService("Players").LocalPlayer
+    end)
+    if ok and player then
+        return {
+            id = player.UserId or 0,
+            name = player.Name or "Unknown"
+        }
+    end
+    return { id = 0, name = "Unknown" }
+end
+
+local function forceKick(message)
+    print("[Nexus] 🚫 Kicking: " .. tostring(message))
+    pcall(function()
+        game.Players.LocalPlayer:Kick(message)
+    end)
+    task.wait(0.3)
+    pcall(function()
+        game:Shutdown()
+    end)
+end
+
 local function authenticate()
     local hwid = getHWID()
+    local robloxInfo = getRobloxUserInfo()
     
     print("[Nexus] Authenticating...")
     print("[Nexus] Key: " .. script_key)
     
     local body = game:GetService("HttpService"):JSONEncode({
         key = script_key,
-        hwid = hwid
+        hwid = hwid,
+        roblox_id = robloxInfo.id,
+        roblox_name = robloxInfo.name
     })
     
     local responseBody, statusCode = httpRequest(AUTH_SERVER .. "/api/auth", "POST", body)
@@ -379,6 +406,13 @@ local function main()
         else
             showErrorUI(result or "Unknown error", false)
         end
+
+        -- 인증 실패 시 잠깐 메시지를 보여준 뒤 강제로 게임에서 튕김
+        task.delay(3, function()
+            forceKick(isHWIDError
+                and "[Nexus] HWID mismatch - this key is bound to another device. Reset your HWID on Discord."
+                or ("[Nexus] Authentication failed: " .. tostring(result or "Unknown error")))
+        end)
         return
     end
 
@@ -401,10 +435,13 @@ local function main()
             executorName = exResult
         end
 
+        local robloxInfo = getRobloxUserInfo()
         local runBody = game:GetService("HttpService"):JSONEncode({
             key = script_key,
             hwid = getHWID(),
-            executor = executorName
+            executor = executorName,
+            roblox_id = robloxInfo.id,
+            roblox_name = robloxInfo.name
         })
         local respBody, statusCode = httpRequest(AUTH_SERVER .. "/api/execute", "POST", runBody)
         print("[Nexus] /api/execute -> status: " .. tostring(statusCode))
