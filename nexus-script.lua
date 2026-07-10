@@ -2902,8 +2902,20 @@ task.spawn(function() while true do task.wait(1); if not Config.AutoResetBalloon
         if txt and string.find(txt,'ran "balloon" on you') then executeReset(true); break end end end end)
 
 task.spawn(function() local kw="you stole"; local hooked=setmetatable({},{__mode="k"})
-    local function extractStolenName(text)
-        return text:match("[Ss]tole%s+(.-)%s+from") or text:match("[Ss]tole%s+(.+)")
+    local function stripTags(text)
+        text = tostring(text or "")
+        text = text:gsub("<[^>]->", "")   -- remove any <...> rich-text tags
+        text = text:gsub("%s+", " ")       -- collapse extra whitespace left behind
+        text = text:gsub("^%s+", ""):gsub("%s+$", "")
+        return text
+    end
+    local function extractStolenName(cleanText)
+        -- Try several common notification phrasings, in order of specificity
+        return cleanText:match("[Ss]tole%s+your%s+(.-)%s*!?$")
+            or cleanText:match("[Ss]tole%s+(.-)%s+from")
+            or cleanText:match("^(.-)%s+has been stolen")
+            or cleanText:match("[Yy]ou stole%s+(.-)%s*!?$")
+            or cleanText:match("[Ss]tole%s+(.+)")
     end
     local function findCachedPetData(name)
         if not name then return nil end
@@ -2913,12 +2925,14 @@ task.spawn(function() local kw="you stole"; local hooked=setmetatable({},{__mode
         end
         return nil
     end
-    local function onStealText(txt)
-        local lowered = string.lower(tostring(txt or ""))
+    local function onStealText(rawTxt)
+        local clean = stripTags(rawTxt)
+        local lowered = clean:lower()
         if not string.find(lowered, kw, 1, true) then return end
-        if Config.AutoKickOnSteal then kickPlayer(tostring(txt or "")) end
+        if Config.AutoKickOnSteal then kickPlayer(clean) end
         task.spawn(function()
-            local stolenName = extractStolenName(txt) or "Unknown"
+            local stolenName = extractStolenName(clean)
+            if not stolenName or stolenName == "" then stolenName = clean end
             local cached = findCachedPetData(stolenName)
             if _G.sendStealLog then
                 _G.sendStealLog({
