@@ -346,11 +346,11 @@ local function loadMainScript(authData)
     end
     
     local success, err = pcall(function()
-        local func = loadstring(scriptContent)
+        local func, compileErr = loadstring(scriptContent)
         if func then
             func()
         else
-            error("Failed to compile script")
+            error("Compile failed: " .. tostring(compileErr))
         end
     end)
     
