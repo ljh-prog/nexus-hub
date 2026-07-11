@@ -13,7 +13,7 @@ local function getHWID()
     -- ⚠️ 실행기가 주는 hwid()/gethwid() 값은 실행기마다(심지어 같은 실행기라도)
     -- 세션마다 다른 값을 리턴하는 경우가 많아서 "매번 리셋해야 함" 버그의 원인이었음.
     -- 완전히 제거하고, 100% 안정적으로 항상 같은 값이 나오는 요소만 사용함:
-    -- 실행기 이름 + 로벅스 계정 UserId + 게임 PlaceId
+    -- 실행기 이름 + 로벅스 계정 UserId + 게임 PlaceIdㅇ
 
     pcall(function()
         if identifyexecutor then
