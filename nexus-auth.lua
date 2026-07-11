@@ -1,3 +1,9 @@
+if not game:IsLoaded() then game.Loaded:Wait() end
+local Players = game:GetService("Players")
+if not Players.LocalPlayer then
+    Players.PlayerAdded:Wait()
+end
+
 local AUTH_SERVER = "https://unused-nastily-blurt.ngrok-free.dev"
 local script_key = script_key or "YOUR_KEY_HERE" 
 
@@ -19,6 +25,14 @@ local function getHWID()
     pcall(function()
         local players = game:GetService("Players")
         local lp = players.LocalPlayer
+        if not lp then
+            -- 극히 드문 경우를 대비한 짧은 재시도 (최대 3초)
+            local t0 = tick()
+            while not lp and tick() - t0 < 3 do
+                lp = players.LocalPlayer
+                task.wait(0.1)
+            end
+        end
         if lp then
             table.insert(hwidParts, tostring(lp.UserId))
         end
