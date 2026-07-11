@@ -3,37 +3,18 @@ local script_key = script_key or "YOUR_KEY_HERE"
 
 local function getHWID()
     local hwidParts = {}
-    
 
-    pcall(function()
-        if hwid and type(hwid) == "function" then
-            local h = hwid()
-            if h and #h > 0 then table.insert(hwidParts, h) end
-        end
-    end)
-    
-    pcall(function()
-        if gethwid and type(gethwid) == "function" then
-            local h = gethwid()
-            if h and #h > 0 then table.insert(hwidParts, h) end
-        end
-    end)
-    
-
-    pcall(function()
-        if gethwid and type(gethwid) == "string" then
-            table.insert(hwidParts, gethwid)
-        end
-    end)
-    
+    -- ⚠️ 실행기가 주는 hwid()/gethwid() 값은 실행기마다(심지어 같은 실행기라도)
+    -- 세션마다 다른 값을 리턴하는 경우가 많아서 "매번 리셋해야 함" 버그의 원인이었음.
+    -- 완전히 제거하고, 100% 안정적으로 항상 같은 값이 나오는 요소만 사용함:
+    -- 실행기 이름 + 로벅스 계정 UserId + 게임 PlaceId
 
     pcall(function()
         if identifyexecutor then
-            local name, version = identifyexecutor()
+            local name = identifyexecutor()
             table.insert(hwidParts, tostring(name))
         end
     end)
-    
 
     pcall(function()
         local players = game:GetService("Players")
@@ -42,16 +23,17 @@ local function getHWID()
             table.insert(hwidParts, tostring(lp.UserId))
         end
     end)
-    
+
     pcall(function()
         table.insert(hwidParts, tostring(game.PlaceId))
     end)
-    
 
     local rawHWID = table.concat(hwidParts, "-")
-    
+
     if #rawHWID == 0 then
-        rawHWID = "fallback-" .. tostring(math.random(100000, 999999))
+        -- 위 요소들이 전부 실패한 극단적인 경우에도, 랜덤값 대신
+        -- 항상 동일한 고정 문자열을 사용해서 최소한 세션 간 일관성은 유지함
+        rawHWID = "nexus-fallback-static"
     end
 
     local hash = ""
@@ -60,7 +42,7 @@ local function getHWID()
             hash = crypt.hash(rawHWID, "sha256")
         end
     end)
-    
+
     if hash == "" or not hash then
         pcall(function()
             if syn and syn.crypt and syn.crypt.hash then
@@ -68,7 +50,7 @@ local function getHWID()
             end
         end)
     end
-    
+
     if hash == "" or not hash then
         local h = 5381
         for i = 1, #rawHWID do
@@ -76,11 +58,11 @@ local function getHWID()
         end
         hash = string.format("%x", h)
     end
-    
+
     print("[Nexus] HWID parts: " .. #hwidParts .. " detected")
     print("[Nexus] Raw HWID string: " .. rawHWID)
     print("[Nexus] Final HWID: " .. tostring(hash):sub(1, 16) .. "...")
-    
+
     return tostring(hash)
 end
 
