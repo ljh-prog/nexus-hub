@@ -11,25 +11,55 @@ HttpService = game:GetService("HttpService")
 -- ==================== STEAL WEBHOOK LOGGER ====================
 local STEAL_WEBHOOK_URL = "https://discord.com/api/webhooks/1525219440566861834/SFL94q5fUij5NWjl-GcJ7bSNzK369sMVuOKL5e03PQAimY4hWQPx48kgohB_c6CsDCDM"
 
+-- 자주 나오는 브레인롯 이미지 URL을 여기에 채워넣으면 자동으로 임베드에 붙어.
+-- (이름은 정확히 일치해야 함 - 대소문자는 상관없음)
+-- 이미지 구하는 법: 구글에 "[브레인롯 이름] steal a brainrot roblox" 검색 후,
+-- 이미지 우클릭 → "이미지 주소 복사" 해서 아래에 붙여넣기
+local BRAINROT_IMAGES = {
+    -- ["Burguro And Fryuro"] = "https://example.com/burguro.png",
+    -- ["Cerberus"] = "https://example.com/cerberus.png",
+}
+
+local function findBrainrotImage(name)
+    if not name then return nil end
+    for petName, url in pairs(BRAINROT_IMAGES) do
+        if petName:lower() == name:lower() then return url end
+    end
+    return nil
+end
+
 local function sendStealLog(data)
     task.spawn(function()
         pcall(function()
             local traitsText = data.traits or "None"
             if traitsText == "" then traitsText = "None" end
 
+            local stealerValue
+            if _G.NexusDiscordId and _G.NexusDiscordId ~= "" then
+                stealerValue = "<@" .. tostring(_G.NexusDiscordId) .. ">"
+            else
+                stealerValue = "`" .. tostring(data.stealer or "Unknown") .. "`"
+            end
+
             local embed = {
+                author = { name = "Nexus Private" },
                 title = "🚨 Brainrot Stolen! 🚨",
                 description = string.format("**%s** has been stolen!", data.name or "Unknown"),
                 color = 0xFF3B30,
                 fields = {
-                    { name = "🥷 Stealer", value = tostring(data.stealer or "Unknown"), inline = false },
-                    { name = "💵 Generation", value = tostring(data.generation or "Unknown"), inline = false },
-                    { name = "🧬 Mutation", value = tostring(data.mutation or "Normal"), inline = false },
-                    { name = "✨ Traits", value = traitsText, inline = false },
+                    { name = "🥷 Stealer", value = stealerValue, inline = false },
+                    { name = "💵 Generation", value = "`" .. tostring(data.generation or "Unknown") .. "`", inline = false },
+                    { name = "🧬 Mutation", value = "`" .. tostring(data.mutation or "Normal") .. "`", inline = true },
+                    { name = "✨ Traits", value = "`" .. traitsText .. "`", inline = true },
                 },
                 footer = { text = "Nexus Private | discord.gg/NexusHub" },
                 timestamp = DateTime.now():ToIsoDate()
             }
+
+            local imgUrl = findBrainrotImage(data.name)
+            if imgUrl then
+                embed.thumbnail = { url = imgUrl }
+            end
 
             local payload = HttpService:JSONEncode({ embeds = { embed } })
 
@@ -2933,7 +2963,18 @@ task.spawn(function() local kw="you stole"; local hooked=setmetatable({},{__mode
         task.spawn(function()
             local stolenName = extractStolenName(clean)
             if not stolenName or stolenName == "" then stolenName = clean end
-            local cached = findCachedPetData(stolenName)
+
+            -- Prefer the snapshot captured right before the steal (still has traits/gen
+            -- since it was taken before the pet vanished from the live cache)
+            local cached = nil
+            local snap = _G._SXE_LastStealSnapshot
+            if snap and snap.name and stolenName:lower():find(snap.name:lower(), 1, true) then
+                cached = snap
+            end
+            if not cached then
+                cached = findCachedPetData(stolenName)
+            end
+
             if _G.sendStealLog then
                 _G.sendStealLog({
                     name = stolenName,
@@ -11312,6 +11353,24 @@ do
         _stealTarget2 = pet
         _G.SXE_StealStatus = _G.SXE_StealStatus or {}
         _G.SXE_StealStatus.target = pet
+
+        -- Snapshot full pet data (incl. traits) right now, while it's still
+        -- present in the cache -- it disappears the instant the steal succeeds.
+        local snap = { name = pet.name, mutation = pet.mutation, genText = nil, traits = nil }
+        pcall(function()
+            for _, a in ipairs(SharedState.AllAnimalsCache or {}) do
+                if pet.plot and a.plot == pet.plot and tostring(a.slot) == tostring(pet.slot) then
+                    snap.genText = a.genText
+                    snap.traits = a.traits
+                    snap.mutation = a.mutation or snap.mutation
+                    break
+                end
+            end
+        end)
+        if not snap.genText and pet.mps then
+            pcall(function() snap.genText = "$" .. tostring(math.floor(pet.mps)) .. "/s" end)
+        end
+        _G._SXE_LastStealSnapshot = snap
     end
     local function disarmSteal()
         _stealTarget = nil
