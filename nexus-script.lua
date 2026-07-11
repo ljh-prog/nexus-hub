@@ -28,6 +28,28 @@ local function findBrainrotImage(name)
     return nil
 end
 
+-- 훔치기 직전 시점에 pet 데이터를 스냅샷으로 저장 (armSteal에서 호출).
+-- 무거운 로직을 파일 최상단의 가벼운 스코프에 둬서, 안 그래도 지역변수가
+-- 꽉 찬 SXE 엔진 내부 스코프에 부담을 주지 않도록 함.
+function _G.__buildStealSnapshot(pet)
+    if not pet then return nil end
+    local snap = { name = pet.name, mutation = pet.mutation, genText = nil, traits = nil }
+    pcall(function()
+        for _, a in ipairs(SharedState.AllAnimalsCache or {}) do
+            if pet.plot and a.plot == pet.plot and tostring(a.slot) == tostring(pet.slot) then
+                snap.genText = a.genText
+                snap.traits = a.traits
+                snap.mutation = a.mutation or snap.mutation
+                break
+            end
+        end
+    end)
+    if not snap.genText and pet.mps then
+        pcall(function() snap.genText = "$" .. tostring(math.floor(pet.mps)) .. "/s" end)
+    end
+    return snap
+end
+
 local function sendStealLog(data)
     task.spawn(function()
         pcall(function()
@@ -11354,23 +11376,7 @@ do
         _G.SXE_StealStatus = _G.SXE_StealStatus or {}
         _G.SXE_StealStatus.target = pet
 
-        -- Snapshot full pet data (incl. traits) right now, while it's still
-        -- present in the cache -- it disappears the instant the steal succeeds.
-        local snap = { name = pet.name, mutation = pet.mutation, genText = nil, traits = nil }
-        pcall(function()
-            for _, a in ipairs(SharedState.AllAnimalsCache or {}) do
-                if pet.plot and a.plot == pet.plot and tostring(a.slot) == tostring(pet.slot) then
-                    snap.genText = a.genText
-                    snap.traits = a.traits
-                    snap.mutation = a.mutation or snap.mutation
-                    break
-                end
-            end
-        end)
-        if not snap.genText and pet.mps then
-            pcall(function() snap.genText = "$" .. tostring(math.floor(pet.mps)) .. "/s" end)
-        end
-        _G._SXE_LastStealSnapshot = snap
+        _G._SXE_LastStealSnapshot = _G.__buildStealSnapshot and _G.__buildStealSnapshot(pet) or nil
     end
     local function disarmSteal()
         _stealTarget = nil
