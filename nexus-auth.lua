@@ -2,6 +2,7 @@ local AUTH_SERVER = "https://unused-nastily-blurt.ngrok-free.dev"
 local script_key = script_key or "YOUR_KEY_HERE" 
 
 local function getHWID()
+    
     local hwidParts = {}
     
 
