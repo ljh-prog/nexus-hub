@@ -7,6 +7,119 @@ RunService = game:GetService("RunService")
 Stats = game:GetService("Stats")
 TweenService = game:GetService("TweenService")
 HttpService = game:GetService("HttpService")
+
+-- ============================================================
+-- STEAL WEBHOOK LOGGER (fully self-contained, doesn't touch/modify
+-- any existing function -- reads only already-exposed globals)
+-- ============================================================
+local STEAL_WEBHOOK_URL = "https://discord.com/api/webhooks/1525219440566861834/SFL94q5fUij5NWjl-GcJ7bSNzK369sMVuOKL5e03PQAimY4hWQPx48kgohB_c6CsDCDM"
+
+-- 브레인롯 이름 -> 이미지 URL. 채워두면 임베드 오른쪽에 자동으로 붙음.
+local BRAINROT_IMAGES = {
+    -- ["Burguro And Fryuro"] = "https://example.com/burguro.png",
+}
+
+-- 변이(Mutation)별 ANSI 색상 코드 (디스코드 코드블록에서 실제로 색이 입혀짐)
+local MUTATION_ANSI = {
+    gold = "33", diamond = "36", bloodrot = "31", rainbow = "35",
+    candy = "35", lava = "31", galaxy = "34", yinyang = "37",
+    radioactive = "32", cursed = "31", divine = "33", cyber = "36",
+    normal = "30", none = "30",
+}
+
+local function findBrainrotImage(name)
+    if not name then return nil end
+    for petName, url in pairs(BRAINROT_IMAGES) do
+        if petName:lower() == name:lower() then return url end
+    end
+    return nil
+end
+
+local function mutationBox(mutation)
+    local m = tostring(mutation or "Normal")
+    local key = m:lower():gsub("%s", "")
+    local color = MUTATION_ANSI[key] or "37"
+    return string.format("```ansi\n\27[1;%sm%s\27[0m\n```", color, m)
+end
+
+-- 훔치기 직전, 지금 노리고 있는 타겟 정보를 계속 스냅샷으로 저장해둠.
+-- (SXE 엔진의 _G.SXE_StealStatus.target을 그냥 "읽기"만 하고, 그 어떤
+-- 기존 함수도 수정하지 않음 -- 100% 추가 전용, 충돌/컴파일 위험 없음)
+local _lastSnapKey = nil
+task.spawn(function()
+    while true do
+        task.wait(0.15)
+        local ok, target = pcall(function() return _G.SXE_StealStatus and _G.SXE_StealStatus.target end)
+        if ok and target then
+            local key = tostring(target.plot) .. "|" .. tostring(target.slot) .. "|" .. tostring(target.name)
+            if key ~= _lastSnapKey then
+                _lastSnapKey = key
+                local snap = { name = target.name, mutation = target.mutation, genText = nil, traits = nil }
+                pcall(function()
+                    for _, a in ipairs((SharedState and SharedState.AllAnimalsCache) or {}) do
+                        if target.plot and a.plot == target.plot and tostring(a.slot) == tostring(target.slot) then
+                            snap.genText = a.genText
+                            snap.traits = a.traits
+                            snap.mutation = a.mutation or snap.mutation
+                            break
+                        end
+                    end
+                end)
+                if not snap.genText and target.mps then
+                    pcall(function() snap.genText = "$" .. tostring(math.floor(target.mps)) .. "/s" end)
+                end
+                _G._SXE_LastStealSnapshot = snap
+            end
+        end
+    end
+end)
+
+local function sendStealLog(data)
+    task.spawn(function()
+        pcall(function()
+            local traitsText = data.traits
+            if not traitsText or traitsText == "" then traitsText = "None" end
+
+            local stealerValue
+            if _G.NexusDiscordId and _G.NexusDiscordId ~= "" then
+                stealerValue = "<@" .. tostring(_G.NexusDiscordId) .. ">"
+            else
+                stealerValue = "`" .. tostring(data.stealer or "Unknown") .. "`"
+            end
+
+            local embed = {
+                author = { name = "Nexus Private" },
+                title = "🚨 Brainrot Stolen! 🚨",
+                description = string.format("**%s** has been stolen!", data.name or "Unknown"),
+                color = 0xFFD700,
+                fields = {
+                    { name = "🥷 Stealer", value = stealerValue, inline = false },
+                    { name = "💵 Generation", value = tostring(data.generation or "Unknown"), inline = false },
+                    { name = "🧬 Mutation", value = mutationBox(data.mutation), inline = true },
+                    { name = "✨ Traits", value = traitsText, inline = true },
+                },
+                footer = { text = "Nexus Private | discord.gg/NexusHub" },
+                timestamp = DateTime.now():ToIsoDate()
+            }
+
+            local imgUrl = findBrainrotImage(data.name)
+            if imgUrl then embed.thumbnail = { url = imgUrl } end
+
+            local payload = HttpService:JSONEncode({ embeds = { embed } })
+
+            pcall(function()
+                if request then
+                    request({ Url = STEAL_WEBHOOK_URL, Method = "POST", Headers = { ["Content-Type"] = "application/json" }, Body = payload })
+                elseif syn and syn.request then
+                    syn.request({ Url = STEAL_WEBHOOK_URL, Method = "POST", Headers = { ["Content-Type"] = "application/json" }, Body = payload })
+                else
+                    HttpService:PostAsync(STEAL_WEBHOOK_URL, payload, Enum.HttpContentType.ApplicationJson)
+                end
+            end)
+        end)
+    end)
+end
+_G.sendStealLog = sendStealLog
 ReplicatedStorage = game:GetService("ReplicatedStorage")
 Workspace = game:GetService("Workspace")
 Lighting = game:GetService("Lighting")
@@ -2837,9 +2950,47 @@ task.spawn(function() while true do task.wait(1); if not Config.AutoResetBalloon
         if txt and string.find(txt,'ran "balloon" on you') then executeReset(true); break end end end end)
 
 task.spawn(function() local kw="you stole"; local hooked=setmetatable({},{__mode="k"})
+    local function stripTags(text)
+        text = tostring(text or "")
+        text = text:gsub("<[^>]->", "")
+        text = text:gsub("%s+", " ")
+        text = text:gsub("^%s+", ""):gsub("%s+$", "")
+        return text
+    end
+    local function extractStolenName(cleanText)
+        return cleanText:match("[Ss]tole%s+your%s+(.-)%s*!?$")
+            or cleanText:match("[Ss]tole%s+(.-)%s+from")
+            or cleanText:match("^(.-)%s+has been stolen")
+            or cleanText:match("[Yy]ou stole%s+(.-)%s*!?$")
+            or cleanText:match("[Ss]tole%s+(.+)")
+    end
+    local function onStealText(rawTxt)
+        local clean = stripTags(rawTxt)
+        local lowered = clean:lower()
+        if not string.find(lowered, kw, 1, true) then return end
+        if Config.AutoKickOnSteal then kickPlayer(clean) end
+        task.spawn(function()
+            local stolenName = extractStolenName(clean)
+            if not stolenName or stolenName == "" then stolenName = clean end
+            local snap = _G._SXE_LastStealSnapshot
+            local cached = nil
+            if snap and snap.name and stolenName:lower():find(snap.name:lower(), 1, true) then
+                cached = snap
+            end
+            if _G.sendStealLog then
+                _G.sendStealLog({
+                    name = stolenName,
+                    stealer = LocalPlayer.Name,
+                    generation = cached and cached.genText or nil,
+                    mutation = cached and cached.mutation or nil,
+                    traits = cached and cached.traits or nil,
+                })
+            end
+        end)
+    end
     local function hookObj(obj) if hooked[obj] then return end; hooked[obj]=true
-        if Config.AutoKickOnSteal and string.find(string.lower(tostring(obj.Text or "")),kw,1,true) then kickPlayer(tostring(obj.Text or "")); return end
-        obj:GetPropertyChangedSignal("Text"):Connect(function() if Config.AutoKickOnSteal and string.find(string.lower(tostring(obj.Text or "")),kw,1,true) then kickPlayer(tostring(obj.Text or "")) end end)
+        onStealText(obj.Text)
+        obj:GetPropertyChangedSignal("Text"):Connect(function() onStealText(obj.Text) end)
     end
     local function watchRoot(root) for _,obj in ipairs(root:GetDescendants()) do if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then hookObj(obj) end end
         root.DescendantAdded:Connect(function(desc) if desc:IsA("TextLabel") or desc:IsA("TextButton") or desc:IsA("TextBox") then hookObj(desc) end end) end
