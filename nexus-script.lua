@@ -691,7 +691,7 @@ actionConfig = {
 }
 
 -- CONFIG (merged)
-local CONFIG_FILE = "sxe_hub_v3_config.json"
+local CONFIG_FILE = "NexusConfig.json"
 local PS_CODE_FILE = "sxe_hub_pscode.txt"
 PrivateServerCode = ""
 
@@ -739,7 +739,7 @@ Config = {
         InfiniteJump=false, DelayVal=0.4, CloneDelayVal=0.1,
         RagdollTP=false, FPSWait=false, FlyTP=false, FlyTPSpeed=160, FlyTPCloseSpeed=75,
         GrabbleTP=false, GrabbleTPSpeed=230,
-        TpOnLoad=false, TpLine=false, MinGenForTp="", MinGenForGrab="",
+        TpOnLoad=false, MinGenForTp="", MinGenForGrab="",
         BrainrotCarpet=false,
     },
     PriorityList=priorityList,
@@ -6084,7 +6084,7 @@ local function refreshBrainrotESP()
     end end
 end
 local function clearBrainrotESP() for _,e in pairs(brainrotBillboards) do if e.bb then e.bb:Destroy() end; if e.highlight then e.highlight:Destroy() end end; brainrotBillboards={} end
-task.spawn(function() while true do task.wait(0.3); if brainrotESPEnabled then pcall(refreshBrainrotESP) end end end)
+task.spawn(function() while true do task.wait(1); if brainrotESPEnabled then pcall(refreshBrainrotESP) end end end)
 
 -- Subspace Mine ESP
 local subspaceMineESPEnabled=Config.SubspaceMineESP; local subspaceMineESPData={}
@@ -7778,9 +7778,8 @@ makeResizable = function(frame, minSize, panelName)
     h.Size = UDim2.new(0, 16, 0, 16)
     h.Position = UDim2.new(1, -16, 1, -16)
     h.BackgroundTransparency = 1
-    h.Text = "◢"
-    h.TextColor3 = Theme.AccentLight or Color3.new(1, 1, 1)
-    h.TextSize = 12
+    h.Text = ""
+    h.TextTransparency = 1
     h.ZIndex = 100
     h.Parent = frame
     local dragging, dragStart, startSize = false, nil, nil
@@ -7815,9 +7814,16 @@ end
 
 function makeHeader(f,t,isMain) local h=Instance.new("Frame"); h.Size=UDim2.new(1,0,0,42); h.BackgroundTransparency=1; h.Parent=f
     local parts={}; for s in string.gmatch(t,"([^\n]+)") do table.insert(parts,s) end
-    if isMain then local l=Instance.new("TextLabel"); l.Size=UDim2.new(1,-50,0,24); l.Position=UDim2.new(0,13,0,8); l.BackgroundTransparency=1; l.Text=parts[1] or "Nexus Private"; l.TextColor3=Color3.fromRGB(255,215,0); l.Font=Enum.Font.GothamBlack; l.TextSize=16; l.TextXAlignment=Enum.TextXAlignment.Left; l.Parent=h; local hg=Instance.new("UIGradient"); hg.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(255,180,0)),ColorSequenceKeypoint.new(0.3,Color3.fromRGB(255,235,150)),ColorSequenceKeypoint.new(0.5,Color3.fromRGB(255,255,220)),ColorSequenceKeypoint.new(0.7,Color3.fromRGB(255,235,150)),ColorSequenceKeypoint.new(1,Color3.fromRGB(255,180,0))}); hg.Rotation=45; hg.Parent=l; task.spawn(function() while true do for i=0,200 do hg.Offset=Vector2.new(-1+i/100,-1+i/100); task.wait(0.01) end; task.wait(0.3) end end)
-    else local l=Instance.new("TextLabel"); l.Size=UDim2.new(1,-58,0,16); l.Position=UDim2.new(0,12,0,7); l.BackgroundTransparency=1; l.Text=parts[1] or "Nexus Private"; l.TextColor3=Theme.Text; l.Font=Enum.Font.GothamBlack; l.TextSize=12; l.TextXAlignment=Enum.TextXAlignment.Center; l.Parent=h
-        local s=Instance.new("TextLabel"); s.Size=UDim2.new(1,-58,0,13); s.Position=UDim2.new(0,12,0,21); s.BackgroundTransparency=1; s.Text=parts[2] or ""; s.TextColor3=Theme.Dim; s.Font=Enum.Font.GothamMedium; s.TextSize=10; s.TextXAlignment=Enum.TextXAlignment.Center; s.Parent=h end
+    if isMain then
+        local hIcon=Instance.new("Frame"); hIcon.Size=UDim2.new(0,30,0,30); hIcon.Position=UDim2.new(0,10,0.5,-15); hIcon.BackgroundColor3=Theme.SoftAccent; hIcon.BorderSizePixel=0; hIcon.Parent=h; Instance.new("UICorner",hIcon).CornerRadius=UDim.new(0,6)
+        local hImg=Instance.new("ImageLabel",hIcon); hImg.Size=UDim2.new(1,0,1,0); hImg.BackgroundTransparency=1; hImg.ScaleType=Enum.ScaleType.Stretch; hImg.Image="rbxthumb://type=Asset&id=81106531045025&w=150&h=150"
+        local l=Instance.new("TextLabel"); l.Size=UDim2.new(0,140,0,26); l.Position=UDim2.new(0,46,0.5,-13); l.BackgroundTransparency=1; l.Text=parts[1] or "Nexus Private"; l.Font=Enum.Font.GothamBlack; l.TextSize=16; l.TextXAlignment=Enum.TextXAlignment.Left; l.Parent=h
+        local hg=Instance.new("UIGradient",l); hg.Rotation=0
+        task.spawn(function() local _s=tick(); while l and l.Parent do local t2=((tick()-_s)%2.5)/2.5; local lo=math.clamp(t2-0.12,0.01,0.87); local hi=math.clamp(t2+0.12,0.13,0.99); hg.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(200,140,0)),ColorSequenceKeypoint.new(lo,Color3.fromRGB(255,210,60)),ColorSequenceKeypoint.new(math.clamp(t2,0.05,0.95),Color3.fromRGB(255,250,180)),ColorSequenceKeypoint.new(hi,Color3.fromRGB(255,210,60)),ColorSequenceKeypoint.new(1,Color3.fromRGB(200,140,0))}); task.wait(0.04) end end)
+    else
+        local l=Instance.new("TextLabel"); l.Size=UDim2.new(1,-58,0,16); l.Position=UDim2.new(0,12,0,7); l.BackgroundTransparency=1; l.Text=parts[1] or "Nexus Private"; l.TextColor3=Theme.Text; l.Font=Enum.Font.GothamBlack; l.TextSize=12; l.TextXAlignment=Enum.TextXAlignment.Center; l.Parent=h
+        local s=Instance.new("TextLabel"); s.Size=UDim2.new(1,-58,0,13); s.Position=UDim2.new(0,12,0,21); s.BackgroundTransparency=1; s.Text=parts[2] or ""; s.TextColor3=Theme.Dim; s.Font=Enum.Font.GothamMedium; s.TextSize=10; s.TextXAlignment=Enum.TextXAlignment.Center; s.Parent=h
+    end
     local d=Instance.new("Frame"); d.Size=UDim2.new(1,-24,0,1); d.Position=UDim2.new(0,12,0,40); d.BackgroundColor3=Color3.fromRGB(180,180,180); d.BackgroundTransparency=0.55; d.BorderSizePixel=0; d.Parent=f
     makeDraggable(f,h,t); return h end
 
@@ -8030,7 +8036,7 @@ function makeKeybindRow(parent,nameText)
     local row=Instance.new("Frame"); row.Size=UDim2.new(1,-4,0,31); row.BackgroundColor3=Theme.Panel; row.BackgroundTransparency=0.18; row.Parent=parent; corner(row,6)
     local l=Instance.new("TextLabel"); l.Size=UDim2.new(1,-88,1,0); l.Position=UDim2.new(0,8,0,0); l.BackgroundTransparency=1; l.Text=nameText; l.TextColor3=Theme.Text; l.Font=Enum.Font.GothamSemibold; l.TextSize=10; l.TextXAlignment=Enum.TextXAlignment.Left; l.Parent=row
     local x=Instance.new("TextButton"); x.Name="WhiteTextBtn"; x.Size=UDim2.new(0,22,0,20); x.Position=UDim2.new(1,-74,0.5,-10); x.BackgroundColor3=Theme.Red; x.Text="X"; x.TextColor3=Color3.new(1,1,1); x.Font=Enum.Font.GothamBold; x.TextSize=10; x.Parent=row; corner(x,5)
-    local key=Instance.new("TextButton"); key.Name="WhiteTextBtn"; key.Size=UDim2.new(0,50,0,20); key.Position=UDim2.new(1,-50,0.5,-10); key.BackgroundColor3=Theme.Accent; key.Text=Keybinds[nameText] or "NONE"; key.TextColor3=Color3.new(1,1,1); key.Font=Enum.Font.GothamBold; key.TextSize=9; key.Parent=row; corner(key,5)
+    local key=Instance.new("TextButton"); key.Name="WhiteTextBtn"; key.Size=UDim2.new(0,50,0,20); key.Position=UDim2.new(1,-50,0.5,-10); key.BackgroundColor3=Color3.fromRGB(220,222,228); key.Text=Keybinds[nameText] or "NONE"; key.TextColor3=Color3.fromRGB(15,15,18); key.Font=Enum.Font.GothamBold; key.TextSize=9; key.Parent=row; corner(key,5)
     x.MouseButton1Click:Connect(function() Keybinds[nameText]="NONE"; Config.keybinds[nameText]="NONE"; saveConfig(); key.Text="NONE"; if updateMovementPanelLabels then updateMovementPanelLabels() end end)
     key.MouseButton1Click:Connect(function() key.Text="..."
         local con; con=UIS.InputBegan:Connect(function(input,gp) if gp then return end; if input.UserInputType==Enum.UserInputType.Keyboard then Keybinds[nameText]=input.KeyCode.Name; Config.keybinds[nameText]=input.KeyCode.Name; saveConfig(); key.Text=input.KeyCode.Name; if nameText=="Open Menu" then UI.OpenMenuKey=input.KeyCode end; con:Disconnect(); if updateMovementPanelLabels then updateMovementPanelLabels() end end end)
@@ -8761,7 +8767,7 @@ function refreshTargetPanel()
 
     for _, pet in ipairs(otherPets) do idx = idx + 1; makeTargetRow(pet, idx, false) end
 end
-task.spawn(function() while true do task.wait(0.4); refreshTargetPanel() end end)
+task.spawn(function() while true do task.wait(1.5); refreshTargetPanel() end end)
 end -- END STEAL TARGET SCOPE
 
 -- ============================================================
@@ -9268,10 +9274,6 @@ function loadTab(tabName)
             saveConfig()
         end)
         makeMainToggle(tpSection,"TP on Load",Config.TpSettings.TpOnLoad,function(on) Config.TpSettings.TpOnLoad=on; saveConfig() end)
-        makeMainToggle(tpSection,"TP Line",Config.TpSettings.TpLine or false,function(on)
-            Config.TpSettings.TpLine=on; saveConfig()
-            if not on and _G._tpLineBeam then pcall(function() _G._tpLineBeam:Destroy() end); _G._tpLineBeam=nil end
-        end)
         local flyGearsSection=makeCollapsibleBar(tpSection,"Fly Gears",false)
         local toolOptions={"Flying Carpet","Cupid's Wings","Santa's Sleigh","Witch's Broom","Waverider"}
         local toolToggles={}
@@ -9725,23 +9727,21 @@ end
 for tabName,btn in pairs(tabButtons) do btn.MouseButton1Click:Connect(function() loadTab(tabName) end) end
 
 -- BOTTOM BAR
-bottomBar=Instance.new("Frame"); bottomBar.Size=UDim2.new(0,479,0,50); bottomBar.Position=UDim2.new(0.5,-240,0,25); bottomBar.BackgroundColor3=Theme.Background; bottomBar.BackgroundTransparency=0.25; bottomBar.BorderSizePixel=0; bottomBar.Parent=gui; corner(bottomBar,10); addOutline(bottomBar)
-local iw=Instance.new("Frame"); iw.Size=UDim2.new(0,34,0,34); iw.Position=UDim2.new(0,12,0.5,-17); iw.BackgroundColor3=Theme.SoftAccent; iw.BorderSizePixel=0; iw.Parent=bottomBar; corner(iw,8)
-local ic=Instance.new("ImageLabel"); ic.Size=UDim2.new(1,0,1,0); ic.BackgroundTransparency=1; ic.ScaleType=Enum.ScaleType.Stretch; ic.Parent=iw
-
-_G.updateLogoImage = function(isDark)
-    ic.Image = "rbxthumb://type=Asset&id=81106531045025&w=150&h=150"
-    ic.ImageColor3 = Color3.fromRGB(255, 255, 255)
-    iw.BackgroundColor3 = Theme.SoftAccent
-end
-_G.updateLogoImage(Config and Config.DarkMode or false)
-local lg=Instance.new("TextLabel"); lg.Size=UDim2.new(0,108,0,26); lg.Position=UDim2.new(0,54,0,5); lg.BackgroundTransparency=1; lg.Text="Nexus Private"; lg.TextColor3=Color3.fromRGB(255,215,0); lg.Font=Enum.Font.GothamBlack; lg.TextSize=16; lg.TextXAlignment=Enum.TextXAlignment.Left; lg.Parent=bottomBar; local lgGrad=Instance.new("UIGradient"); lgGrad.Rotation=0; lgGrad.Parent=lg; do local _s=tick(); local _c; _c=RunService.Heartbeat:Connect(function() if not lg or not lg.Parent then _c:Disconnect(); return end; local t=((tick()-_s)%2)/2; local lo=math.clamp(t-0.14,0.01,0.83); local hi=math.clamp(t+0.14,0.17,0.99); lgGrad.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(255,185,10)),ColorSequenceKeypoint.new(lo,Color3.fromRGB(255,235,90)),ColorSequenceKeypoint.new(math.clamp(t,0.04,0.96),Color3.fromRGB(255,255,200)),ColorSequenceKeypoint.new(hi,Color3.fromRGB(255,235,90)),ColorSequenceKeypoint.new(1,Color3.fromRGB(230,160,5))}); end) end
-local dc=Instance.new("TextLabel"); dc.Size=UDim2.new(0,160,0,14); dc.Position=UDim2.new(0,55,0,32); dc.BackgroundTransparency=1; dc.Text=".gg/NexusHub"; dc.Font=Enum.Font.GothamBold; dc.TextSize=13; dc.TextXAlignment=Enum.TextXAlignment.Left; dc.Parent=bottomBar; local dcGrad=Instance.new("UIGradient"); dcGrad.Rotation=0; dcGrad.Parent=dc; do local _sd=tick(); local _cd; _cd=RunService.Heartbeat:Connect(function() if not dc or not dc.Parent then _cd:Disconnect(); return end; local t=((tick()-_sd)%2)/2; local lo=math.clamp(t-0.14,0.01,0.83); local hi=math.clamp(t+0.14,0.17,0.99); dcGrad.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(255,185,10)),ColorSequenceKeypoint.new(lo,Color3.fromRGB(255,235,90)),ColorSequenceKeypoint.new(math.clamp(t,0.04,0.96),Color3.fromRGB(255,255,200)),ColorSequenceKeypoint.new(hi,Color3.fromRGB(255,235,90)),ColorSequenceKeypoint.new(1,Color3.fromRGB(230,160,5))}); end) end
--- discord link removed
--- Developer label removed (dc occupies this row)
-local rightDiv=Instance.new("Frame"); rightDiv.Size=UDim2.new(0,1,0,36); rightDiv.Position=UDim2.new(1,-138,0.5,-18); rightDiv.BackgroundColor3=Theme.Accent; rightDiv.BackgroundTransparency=0.35; rightDiv.BorderSizePixel=0; rightDiv.Parent=bottomBar
-fpsText=Instance.new("TextLabel"); fpsText.Size=UDim2.new(0,126,1,0); fpsText.Position=UDim2.new(1,-128,0,0); fpsText.BackgroundTransparency=1; fpsText.RichText=true; fpsText.Text="FPS: --\nPING: --ms"; fpsText.TextColor3=Theme.Green; fpsText.Font=Enum.Font.GothamBold; fpsText.TextSize=10; fpsText.TextXAlignment=Enum.TextXAlignment.Left; fpsText.Parent=bottomBar
-bottomBar.Visible = true
+bottomBar=Instance.new("Frame"); bottomBar.Size=UDim2.new(0,490,0,52); bottomBar.Position=UDim2.new(0.5,-245,0,24); bottomBar.BackgroundColor3=Theme.Background; bottomBar.BackgroundTransparency=0.22; bottomBar.BorderSizePixel=0; bottomBar.Parent=gui; corner(bottomBar,10); addOutline(bottomBar)
+local iw=Instance.new("Frame"); iw.Size=UDim2.new(0,36,0,36); iw.Position=UDim2.new(0,9,0.5,-18); iw.BackgroundColor3=Theme.SoftAccent; iw.BorderSizePixel=0; iw.Parent=bottomBar; corner(iw,8)
+local ic=Instance.new("ImageLabel",iw); ic.Size=UDim2.new(1,0,1,0); ic.BackgroundTransparency=1; ic.ScaleType=Enum.ScaleType.Stretch; ic.Image="rbxthumb://type=Asset&id=81106531045025&w=150&h=150"
+_G.updateLogoImage=function(isDark) ic.Image="rbxthumb://type=Asset&id=81106531045025&w=150&h=150" end
+local lg=Instance.new("TextLabel"); lg.Size=UDim2.new(0,114,0,22); lg.Position=UDim2.new(0,52,0,6); lg.BackgroundTransparency=1; lg.Text="Nexus Private"; lg.Font=Enum.Font.GothamBlack; lg.TextSize=16; lg.TextColor3=Color3.fromRGB(255,220,60); lg.TextXAlignment=Enum.TextXAlignment.Left; lg.Parent=bottomBar; do local _lgG=Instance.new("UIGradient",lg); _lgG.Rotation=0; local _lgS=tick(); local _lgC; _lgC=RunService.Heartbeat:Connect(function() if not lg or not lg.Parent then _lgC:Disconnect(); return end; local t=((tick()-_lgS)%2)/2; _lgG.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(255,200,30)),ColorSequenceKeypoint.new(math.clamp(t-0.12,0.01,0.85),Color3.fromRGB(255,238,110)),ColorSequenceKeypoint.new(math.clamp(t,0.05,0.95),Color3.fromRGB(255,255,200)),ColorSequenceKeypoint.new(math.clamp(t+0.12,0.15,0.99),Color3.fromRGB(255,238,110)),ColorSequenceKeypoint.new(1,Color3.fromRGB(235,170,20))}); end) end
+local lgG=Instance.new("UIGradient",lg); lgG.Rotation=0
+task.spawn(function() local _s=tick(); while lg and lg.Parent do local t=((tick()-_s)%2.5)/2.5; local lo=math.clamp(t-0.12,0.01,0.87); local hi=math.clamp(t+0.12,0.13,0.99); lgG.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(200,140,0)),ColorSequenceKeypoint.new(lo,Color3.fromRGB(255,215,60)),ColorSequenceKeypoint.new(math.clamp(t,0.05,0.95),Color3.fromRGB(255,252,180)),ColorSequenceKeypoint.new(hi,Color3.fromRGB(255,215,60)),ColorSequenceKeypoint.new(1,Color3.fromRGB(200,140,0))}); task.wait(0.04) end end)
+local byLbl=Instance.new("TextLabel"); byLbl.Size=UDim2.new(0,180,0,14); byLbl.Position=UDim2.new(0,53,0,29); byLbl.BackgroundTransparency=1; byLbl.Text="Developer: jx5ne_, udai_7"; byLbl.TextColor3=Color3.fromRGB(130,130,140); byLbl.Font=Enum.Font.GothamMedium; byLbl.TextSize=9; byLbl.TextXAlignment=Enum.TextXAlignment.Left; byLbl.Parent=bottomBar
+local midDiv=Instance.new("Frame"); midDiv.Size=UDim2.new(0,1,0,30); midDiv.Position=UDim2.new(0,248,0.5,-15); midDiv.BackgroundColor3=Color3.fromRGB(210,210,210); midDiv.BackgroundTransparency=0.45; midDiv.BorderSizePixel=0; midDiv.Parent=bottomBar
+local dc=Instance.new("TextLabel"); dc.Size=UDim2.new(0,96,0,22); dc.Position=UDim2.new(0,258,0.5,-11); dc.BackgroundTransparency=1; dc.Text=".gg/NexusHub"; dc.Font=Enum.Font.GothamBold; dc.TextSize=13; dc.TextColor3=Color3.fromRGB(255,220,60); dc.TextXAlignment=Enum.TextXAlignment.Left; dc.Parent=bottomBar; do local _dcG=Instance.new("UIGradient",dc); _dcG.Rotation=0; local _dcS=tick(); local _dcC; _dcC=RunService.Heartbeat:Connect(function() if not dc or not dc.Parent then _dcC:Disconnect(); return end; local t=((tick()-_dcS)%2)/2; _dcG.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(255,200,30)),ColorSequenceKeypoint.new(math.clamp(t-0.12,0.01,0.85),Color3.fromRGB(255,238,110)),ColorSequenceKeypoint.new(math.clamp(t,0.05,0.95),Color3.fromRGB(255,255,200)),ColorSequenceKeypoint.new(math.clamp(t+0.12,0.15,0.99),Color3.fromRGB(255,238,110)),ColorSequenceKeypoint.new(1,Color3.fromRGB(235,170,20))}); end) end
+local dcG=Instance.new("UIGradient",dc); dcG.Rotation=0
+task.spawn(function() local _sd=tick(); while dc and dc.Parent do local t=((tick()-_sd)%2.5)/2.5; local lo=math.clamp(t-0.12,0.01,0.87); local hi=math.clamp(t+0.12,0.13,0.99); dcG.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(200,140,0)),ColorSequenceKeypoint.new(lo,Color3.fromRGB(255,215,60)),ColorSequenceKeypoint.new(math.clamp(t,0.05,0.95),Color3.fromRGB(255,252,180)),ColorSequenceKeypoint.new(hi,Color3.fromRGB(255,215,60)),ColorSequenceKeypoint.new(1,Color3.fromRGB(200,140,0))}); task.wait(0.04) end end)
+local rightDiv=Instance.new("Frame"); rightDiv.Size=UDim2.new(0,1,0,30); rightDiv.Position=UDim2.new(1,-132,0.5,-15); rightDiv.BackgroundColor3=Color3.fromRGB(210,210,210); rightDiv.BackgroundTransparency=0.45; rightDiv.BorderSizePixel=0; rightDiv.Parent=bottomBar
+fpsText=Instance.new("TextLabel"); fpsText.Size=UDim2.new(0,120,1,0); fpsText.Position=UDim2.new(1,-124,0,0); fpsText.BackgroundTransparency=1; fpsText.Text="FPS: --\nPING: --ms"; fpsText.TextColor3=Theme.Green; fpsText.Font=Enum.Font.GothamBold; fpsText.TextSize=11; fpsText.RichText=true; fpsText.TextXAlignment=Enum.TextXAlignment.Left; fpsText.TextYAlignment=Enum.TextYAlignment.Center; fpsText.Parent=bottomBar
+bottomBar.Visible=true
 
 task.defer(function()
     loadTab("Main")
@@ -10966,29 +10966,6 @@ do
         if rootPart and rootPart.Parent then lvStop(rootPart) end
     end
 
-    local function showTPLine(fromPos, toPos)
-        if not (Config.TpSettings and Config.TpSettings.TpLine) then return end
-        task.spawn(function()
-            pcall(function()
-                if _G._tpLineBeam then _G._tpLineBeam:Destroy(); _G._tpLineBeam=nil end
-                local folder=Instance.new("Folder"); folder.Parent=workspace
-                local a0=Instance.new("Attachment"); a0.WorldPosition=fromPos; a0.Parent=workspace.Terrain
-                local a1=Instance.new("Attachment"); a1.WorldPosition=toPos; a1.Parent=workspace.Terrain
-                local beam=Instance.new("Beam")
-                beam.Attachment0=a0; beam.Attachment1=a1
-                beam.Color=ColorSequence.new(Color3.fromRGB(80,160,255))
-                beam.Width0=0.08; beam.Width1=0.08
-                beam.Transparency=NumberSequence.new(0.2)
-                beam.LightEmission=0.8; beam.LightInfluence=0
-                beam.Parent=folder
-                _G._tpLineBeam=folder
-                task.delay(5,function()
-                    pcall(function() folder:Destroy() end)
-                    if _G._tpLineBeam==folder then _G._tpLineBeam=nil end
-                end)
-            end)
-        end)
-    end
 
     local function goToBrainrot(petPos)
         if not petPos then return end
@@ -11697,9 +11674,6 @@ do
                 end
             end
             if _cloneSucceeded then
-                -- TP Line 표시
-                local _lhrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
-                if _lhrp then pcall(showTPLine, _lhrp.Position, petPos) end
                 goToBrainrot(petPos)
                 pcall(function()
                     local vim = Instance.new("VirtualInputManager")
@@ -11770,7 +11744,7 @@ do
     local ulScroll=Instance.new("ScrollingFrame",ulPanel); ulScroll.Size=UDim2.new(1,-16,1,-52); ulScroll.Position=UDim2.new(0,8,0,46); ulScroll.BackgroundTransparency=1; ulScroll.BorderSizePixel=0; ulScroll.ScrollBarThickness=3; ulScroll.CanvasSize=UDim2.new(0,0,0,0); ulScroll.AutomaticCanvasSize=Enum.AutomaticSize.Y
     local ulLL=Instance.new("UIListLayout",ulScroll); ulLL.Padding=UDim.new(0,5); ulLL.SortOrder=Enum.SortOrder.LayoutOrder
 
-    for i,txt in ipairs({"1.  Added Update Logs","2.  Improved TP","3.  Fixed TP to brainrots","4.  Added TP Line","5.  Improved FPS Boost","6.  Removed Auto Turret"}) do
+    for i,txt in ipairs({"1.  Added Update Logs","2.  Improved TP","3.  Fixed TP to brainrots","5.  Improved FPS Boost","6.  Removed Auto Turret"}) do
         local row=Instance.new("TextLabel",ulScroll); row.Size=UDim2.new(1,0,0,30); row.BackgroundColor3=Color3.fromRGB(22,22,28); row.BackgroundTransparency=i%2==0 and 0.3 or 0.0; row.BorderSizePixel=0; row.Text="  "..txt; row.TextColor3=Color3.fromRGB(210,210,220); row.Font=Enum.Font.GothamSemibold; row.TextSize=12; row.TextXAlignment=Enum.TextXAlignment.Left; row.LayoutOrder=i; corner(row,5)
     end
 
