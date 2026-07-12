@@ -7,123 +7,6 @@ RunService = game:GetService("RunService")
 Stats = game:GetService("Stats")
 TweenService = game:GetService("TweenService")
 HttpService = game:GetService("HttpService")
-
--- ==================== STEAL WEBHOOK LOGGER ====================
-local STEAL_WEBHOOK_URL = "https://discord.com/api/webhooks/1525219440566861834/SFL94q5fUij5NWjl-GcJ7bSNzK369sMVuOKL5e03PQAimY4hWQPx48kgohB_c6CsDCDM"
-
--- 자주 나오는 브레인롯 이미지 URL을 여기에 채워넣으면 자동으로 임베드에 붙어.
--- (이름은 정확히 일치해야 함 - 대소문자는 상관없음)
--- 이미지 구하는 법: 구글에 "[브레인롯 이름] steal a brainrot roblox" 검색 후,
--- 이미지 우클릭 → "이미지 주소 복사" 해서 아래에 붙여넣기
-local BRAINROT_IMAGES = {
-    -- ["Burguro And Fryuro"] = "https://example.com/burguro.png",
-    -- ["Cerberus"] = "https://example.com/cerberus.png",
-}
-
-local function findBrainrotImage(name)
-    if not name then return nil end
-    for petName, url in pairs(BRAINROT_IMAGES) do
-        if petName:lower() == name:lower() then return url end
-    end
-    return nil
-end
-
--- 훔치기 직전 시점에 pet 데이터를 스냅샷으로 저장 (armSteal에서 호출).
--- 무거운 로직을 파일 최상단의 가벼운 스코프에 둬서, 안 그래도 지역변수가
--- 꽉 찬 SXE 엔진 내부 스코프에 부담을 주지 않도록 함.
-function _G.__buildStealSnapshot(pet)
-    if not pet then return nil end
-    local snap = { name = pet.name, mutation = pet.mutation, genText = nil, traits = nil }
-    pcall(function()
-        for _, a in ipairs(SharedState.AllAnimalsCache or {}) do
-            if pet.plot and a.plot == pet.plot and tostring(a.slot) == tostring(pet.slot) then
-                snap.genText = a.genText
-                snap.traits = a.traits
-                snap.mutation = a.mutation or snap.mutation
-                break
-            end
-        end
-    end)
-    if not snap.genText and pet.mps then
-        pcall(function() snap.genText = "$" .. tostring(math.floor(pet.mps)) .. "/s" end)
-    end
-    return snap
-end
-
-local function sendStealLog(data)
-    task.spawn(function()
-        pcall(function()
-            local traitsText = data.traits or "None"
-            if traitsText == "" then traitsText = "None" end
-
-            local stealerValue
-            if _G.NexusDiscordId and _G.NexusDiscordId ~= "" then
-                stealerValue = "<@" .. tostring(_G.NexusDiscordId) .. ">"
-            else
-                stealerValue = "`" .. tostring(data.stealer or "Unknown") .. "`"
-            end
-
-            local embed = {
-                author = { name = "Nexus Private" },
-                title = "🚨 Brainrot Stolen! 🚨",
-                description = string.format("**%s** has been stolen!", data.name or "Unknown"),
-                color = 0xFF3B30,
-                fields = {
-                    { name = "🥷 Stealer", value = stealerValue, inline = false },
-                    { name = "💵 Generation", value = "`" .. tostring(data.generation or "Unknown") .. "`", inline = false },
-                    { name = "🧬 Mutation", value = "`" .. tostring(data.mutation or "Normal") .. "`", inline = true },
-                    { name = "✨ Traits", value = "`" .. traitsText .. "`", inline = true },
-                },
-                footer = { text = "Nexus Private | discord.gg/NexusHub" },
-                timestamp = DateTime.now():ToIsoDate()
-            }
-
-            local imgUrl = findBrainrotImage(data.name)
-            if imgUrl then
-                embed.thumbnail = { url = imgUrl }
-            end
-
-            local payload = HttpService:JSONEncode({ embeds = { embed } })
-
-            pcall(function()
-                if request then
-                    request({ Url = STEAL_WEBHOOK_URL, Method = "POST", Headers = { ["Content-Type"] = "application/json" }, Body = payload })
-                elseif syn and syn.request then
-                    syn.request({ Url = STEAL_WEBHOOK_URL, Method = "POST", Headers = { ["Content-Type"] = "application/json" }, Body = payload })
-                else
-                    HttpService:PostAsync(STEAL_WEBHOOK_URL, payload, Enum.HttpContentType.ApplicationJson)
-                end
-            end)
-        end)
-    end)
-end
-_G.sendStealLog = sendStealLog
-
--- 훔치기 완료 시점엔 이미 소유권이 넘어가서 캐시에서 사라진 경우가 많음.
--- 그래서 "타겟이 락온된 시점"에 미리 Generation/Mutation/Traits를 저장해둠.
-_G.SXE_LastArmedPets = _G.SXE_LastArmedPets or {}
-local function registerArmedPetInfo(name, plotName, slotName)
-    if not name then return end
-    task.defer(function()
-        local info = nil
-        for _, a in ipairs(SharedState.AllAnimalsCache or {}) do
-            if (plotName and slotName and a.plot == plotName and tostring(a.slot) == tostring(slotName))
-               or (a.name and a.name:lower() == name:lower()) then
-                info = a
-                break
-            end
-        end
-        if info then
-            _G.SXE_LastArmedPets[name:lower()] = {
-                genText = info.genText or info.mpsText,
-                mutation = info.mutation,
-                traits = info.traits,
-                ts = os.clock()
-            }
-        end
-    end)
-end
-_G.registerArmedPetInfo = registerArmedPetInfo
 ReplicatedStorage = game:GetService("ReplicatedStorage")
 Workspace = game:GetService("Workspace")
 Lighting = game:GetService("Lighting")
@@ -2954,63 +2837,9 @@ task.spawn(function() while true do task.wait(1); if not Config.AutoResetBalloon
         if txt and string.find(txt,'ran "balloon" on you') then executeReset(true); break end end end end)
 
 task.spawn(function() local kw="you stole"; local hooked=setmetatable({},{__mode="k"})
-    local function stripTags(text)
-        text = tostring(text or "")
-        text = text:gsub("<[^>]->", "")   -- remove any <...> rich-text tags
-        text = text:gsub("%s+", " ")       -- collapse extra whitespace left behind
-        text = text:gsub("^%s+", ""):gsub("%s+$", "")
-        return text
-    end
-    local function extractStolenName(cleanText)
-        -- Try several common notification phrasings, in order of specificity
-        return cleanText:match("[Ss]tole%s+your%s+(.-)%s*!?$")
-            or cleanText:match("[Ss]tole%s+(.-)%s+from")
-            or cleanText:match("^(.-)%s+has been stolen")
-            or cleanText:match("[Yy]ou stole%s+(.-)%s*!?$")
-            or cleanText:match("[Ss]tole%s+(.+)")
-    end
-    local function findCachedPetData(name)
-        if not name then return nil end
-        local lname = name:lower()
-        for _, a in ipairs(SharedState.AllAnimalsCache or {}) do
-            if a.name and a.name:lower() == lname then return a end
-        end
-        return nil
-    end
-    local function onStealText(rawTxt)
-        local clean = stripTags(rawTxt)
-        local lowered = clean:lower()
-        if not string.find(lowered, kw, 1, true) then return end
-        if Config.AutoKickOnSteal then kickPlayer(clean) end
-        task.spawn(function()
-            local stolenName = extractStolenName(clean)
-            if not stolenName or stolenName == "" then stolenName = clean end
-
-            -- Prefer the snapshot captured right before the steal (still has traits/gen
-            -- since it was taken before the pet vanished from the live cache)
-            local cached = nil
-            local snap = _G._SXE_LastStealSnapshot
-            if snap and snap.name and stolenName:lower():find(snap.name:lower(), 1, true) then
-                cached = snap
-            end
-            if not cached then
-                cached = findCachedPetData(stolenName)
-            end
-
-            if _G.sendStealLog then
-                _G.sendStealLog({
-                    name = stolenName,
-                    stealer = LocalPlayer.Name,
-                    generation = cached and cached.genText or nil,
-                    mutation = cached and cached.mutation or nil,
-                    traits = cached and cached.traits or nil,
-                })
-            end
-        end)
-    end
     local function hookObj(obj) if hooked[obj] then return end; hooked[obj]=true
-        onStealText(obj.Text)
-        obj:GetPropertyChangedSignal("Text"):Connect(function() onStealText(obj.Text) end)
+        if Config.AutoKickOnSteal and string.find(string.lower(tostring(obj.Text or "")),kw,1,true) then kickPlayer(tostring(obj.Text or "")); return end
+        obj:GetPropertyChangedSignal("Text"):Connect(function() if Config.AutoKickOnSteal and string.find(string.lower(tostring(obj.Text or "")),kw,1,true) then kickPlayer(tostring(obj.Text or "")) end end)
     end
     local function watchRoot(root) for _,obj in ipairs(root:GetDescendants()) do if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then hookObj(obj) end end
         root.DescendantAdded:Connect(function(desc) if desc:IsA("TextLabel") or desc:IsA("TextButton") or desc:IsA("TextBox") then hookObj(desc) end end) end
@@ -11375,8 +11204,6 @@ do
         _stealTarget2 = pet
         _G.SXE_StealStatus = _G.SXE_StealStatus or {}
         _G.SXE_StealStatus.target = pet
-
-        _G._SXE_LastStealSnapshot = _G.__buildStealSnapshot and _G.__buildStealSnapshot(pet) or nil
     end
     local function disarmSteal()
         _stealTarget = nil
