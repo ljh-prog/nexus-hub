@@ -403,7 +403,6 @@ local function main()
     end
 
     sessionToken = result.session_token
-    _G.NexusDiscordId = result.discord_id
 
     startHeartbeat()
 
