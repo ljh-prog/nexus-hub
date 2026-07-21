@@ -78,9 +78,9 @@ local function getHWID()
         hash = string.format("%x", h)
     end
     
-    print("[Nexus] HWID parts: " .. #hwidParts .. " detected")
-    print("[Nexus] Raw HWID string: " .. rawHWID)
-    print("[Nexus] Final HWID: " .. tostring(hash):sub(1, 16) .. "...")
+    print(" HWID parts: " .. #hwidParts .. " detected")
+    print(" Raw HWID string: " .. rawHWID)
+    print(" Final HWID: " .. tostring(hash):sub(1, 16) .. "...")
     
     return tostring(hash)
 end
@@ -89,7 +89,7 @@ end
 local function httpRequest(url, method, body)
     method = method or "GET"
     
-    print("[Nexus] HTTP " .. method .. " " .. url)
+    print(" HTTP " .. method .. " " .. url)
     
     local success, result = pcall(function()
 
@@ -166,11 +166,11 @@ local function httpRequest(url, method, body)
     end)
     
     if success and result then
-        print("[Nexus] HTTP Response: " .. tostring(result.StatusCode))
+        print(" HTTP Response: " .. tostring(result.StatusCode))
         return result.Body, result.StatusCode
     end
     
-    print("[Nexus] HTTP Error: " .. tostring(result))
+    print(" HTTP Error: " .. tostring(result))
     return nil, 0
 end
 
@@ -269,7 +269,7 @@ local function getRobloxUserInfo()
 end
 
 local function forceKick(message)
-    print("[Nexus] 🚫 Kicking: " .. tostring(message))
+    print(" 🚫 Kicking: " .. tostring(message))
     -- Player:Kick()을 부르면 로벅스 자체의 "연결 끊김" 화면(오류 코드 277, 나가기/재연결 버튼)이
     -- 자동으로 표시됨. 커스텀 UI를 따로 그릴 필요 없음.
     local ok = pcall(function()
@@ -277,7 +277,7 @@ local function forceKick(message)
     end)
     if not ok then
         -- Kick 자체가 막힌 실행기에서만 최후의 수단으로 강제 종료
-        print("[Nexus] ⚠️ Player:Kick() failed, falling back to game:Shutdown()")
+        print(" ⚠️ Player:Kick() failed, falling back to game:Shutdown()")
         pcall(function()
             game:Shutdown()
         end)
@@ -288,8 +288,8 @@ local function authenticate()
     local hwid = getHWID()
     local robloxInfo = getRobloxUserInfo()
     
-    print("[Nexus] Authenticating...")
-    print("[Nexus] Key: " .. script_key)
+    print(" Authenticating...")
+    print(" Key: " .. script_key)
     
     local body = game:GetService("HttpService"):JSONEncode({
         key = script_key,
@@ -312,7 +312,7 @@ local function authenticate()
             end)
         end
         
-        print("[Nexus] ❌ Authentication failed: " .. errorMsg)
+        print(" ❌ Authentication failed: " .. errorMsg)
         return false, errorMsg, errorCode
     end
     
@@ -324,12 +324,12 @@ local function authenticate()
     if not success or not parsed.success then
         local errorMsg = (parsed and parsed.error) or "Unknown error"
         local errorCode = (parsed and parsed.code) or nil
-        print("[Nexus] ❌ Authentication failed: " .. errorMsg)
+        print(" ❌ Authentication failed: " .. errorMsg)
         return false, errorMsg, errorCode
     end
     
-    print("[Nexus] ✅ Authentication successful!")
-    print("[Nexus] Session: " .. (parsed.session_token or "N/A"))
+    print(" ✅ Authentication successful!")
+    print(" Session: " .. (parsed.session_token or "N/A"))
     
     return true, parsed
 end
@@ -337,16 +337,16 @@ end
 
 local function loadMainScript(authData)
     if not authData or not authData.script_url then
-        print("[Nexus] ❌ No script URL received")
+        print(" ❌ No script URL received")
         return false
     end
     
-    print("[Nexus] 📜 Loading script from: " .. authData.script_url)
+    print(" 📜 Loading script from: " .. authData.script_url)
     
     local scriptContent, statusCode = httpRequest(authData.script_url, "GET")
     
     if not scriptContent or statusCode ~= 200 then
-        print("[Nexus] ❌ Failed to load script (status: " .. tostring(statusCode) .. ")")
+        print(" ❌ Failed to load script (status: " .. tostring(statusCode) .. ")")
         return false
     end
     
@@ -360,11 +360,11 @@ local function loadMainScript(authData)
     end)
     
     if not success then
-        print("[Nexus] ❌ Script execution error: " .. tostring(err))
+        print(" ❌ Script execution error: " .. tostring(err))
         return false
     end
     
-    print("[Nexus] ✅ Script loaded successfully!")
+    print(" ✅ Script loaded successfully!")
     return true
 end
 
@@ -385,9 +385,9 @@ end
 
 
 local function main()
-    print("[Nexus] ===================================")
-    print("[Nexus] Nexus Private Auth Wrapper v3")
-    print("[Nexus] ===================================")
+    print(" ===================================")
+    print(" Nexus Private Auth Wrapper v3")
+    print(" ===================================")
     
 
     local success, result, errorCode = authenticate()
@@ -398,8 +398,8 @@ local function main()
 
         -- Player:Kick() 호출 시 로벅스 자체 "연결 끊김" 화면이 자동으로 뜸
         forceKick(isHWIDError
-            and "[Nexus] HWID Mismatch - This key is bound to another device.\nGo to our Discord server and use HWID Reset, then rejoin."
-            or ("[Nexus] Authentication failed: " .. tostring(result or "Unknown error")))
+            and " HWID Mismatch - This key is bound to another device.\nGo to our Discord server and use HWID Reset, then rejoin."
+            or (" Authentication failed: " .. tostring(result or "Unknown error")))
         return
     end
 
@@ -408,7 +408,7 @@ local function main()
     startHeartbeat()
 
     -- 실제 스크립트 실행 로그를 웹 서버로 전송 (디바이스/실행 감지)
-    print("[Nexus] Sending execution log...")
+    print(" Sending execution log...")
     local execOk, execErr = pcall(function()
         local executorName = "Unknown"
         local exOk, exResult = pcall(function()
@@ -431,10 +431,10 @@ local function main()
             roblox_name = robloxInfo.name
         })
         local respBody, statusCode = httpRequest(AUTH_SERVER .. "/api/execute", "POST", runBody)
-        print("[Nexus] /api/execute -> status: " .. tostring(statusCode))
+        print(" /api/execute -> status: " .. tostring(statusCode))
     end)
     if not execOk then
-        print("[Nexus] ❌ Execute-log block errored: " .. tostring(execErr))
+        print(" ❌ Execute-log block errored: " .. tostring(execErr))
     end
 
     loadMainScript(result)
